@@ -748,8 +748,8 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.db = None
         self.cur = None
         self.qa.setEnabled(False)
-        if os.path.exists('./DeepCID.db'):
-            AppWindow.connect_db(self, './DeepCID.db')
+        if os.path.exists('./EasyCID.db'):
+            AppWindow.connect_db(self, './EasyCID.db')
 
         if tf.config.experimental.list_physical_devices('GPU'):
             gpus = tf.config.list_physical_devices(device_type='GPU')
@@ -778,7 +778,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
 
     def link_to_db(self):
         file_name, type = QFileDialog.getOpenFileName(self.centralwidget, "Choose database",
-                                                      r"C:\Users\Sunshine\Desktop\DeepCID_GUI", 'database (*.db)')
+                                                      r"C:/", 'database (*.db)')
         if not file_name:
             return
         AppWindow.connect_db(self, file_name)
@@ -1545,7 +1545,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             self.plot_lock = False
 
     def closeEvent(self, event):
-        messageBox = QMessageBox(QMessageBox.Question, "Confirm Exit", "Are you sure you want to exit DeepCID?")
+        messageBox = QMessageBox(QMessageBox.Question, "Confirm Exit", "Are you sure you want to exit EasyCID?")
         Qyes = messageBox.addButton(self.tr("Exit"), QMessageBox.YesRole)
         Qno = messageBox.addButton(self.tr("Cancel"), QMessageBox.NoRole)
         messageBox.exec_()
