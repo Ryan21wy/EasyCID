@@ -395,7 +395,7 @@ class QuantitativeAnalysis(QDialog):
 
 
 class PredictionRun(QDialog):
-    signal_parp = pyqtSignal(str)
+    signal_parp = pyqtSignal(list)
 
     def __init__(self, table_list):
         QDialog.__init__(self)
@@ -406,8 +406,12 @@ class PredictionRun(QDialog):
         self.child.OK.clicked.connect(self.signal_emit)
 
     def signal_emit(self):
+        signal = []
         table = self.child.comboBox.currentText()
-        self.signal_parp.emit(table)
+        threshold = self.child.Threshold.value()
+        signal.append(table)
+        signal.append(threshold)
+        self.signal_parp.emit(signal)
         PredictionRun.close(self)
 
 
@@ -548,7 +552,6 @@ class PredRun(QThread):
             self.data_signal.emit(y_DeepCID)
             self.signal.emit('finished')
         except Exception as err:
-            print(str(err))
             self.signal.emit(str(err))
 
 
@@ -727,6 +730,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.t_new_axis = None
         self.train_table = ''
         self.pred_table = ''
+        self.threshold = 0.5
         self.pred_names = []
         self.pred_data = []
         self.pred_param = {}
@@ -1338,7 +1342,8 @@ class AppWindow(QMainWindow, Ui_MainWindow):
     def predict_process(self, m):
         if not m:
             return
-        self.pred_table = m
+        self.pred_table = m[0]
+        self.threshold = m[1]
         datas_list = self.cur.execute('SELECT New_Axis,Model_Path FROM "%s" '
                                       'WHERE Get_trained="Yes"' % self.pred_table).fetchall()
         if not datas_list:
@@ -1388,7 +1393,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         components = self.cur.execute('SELECT Component, New_Axis FROM "%s" WHERE Get_trained="Yes"' % self.pred_table)
         component_list = components.fetchall()
         for i in range(len(self.pred_names)):
-            num = np.where(self.pred_prob[:, i] > 0.5)[0]
+            num = np.where(self.pred_prob[:, i] >= self.threshold)[0]
             self.result_list[self.pred_names[i]] = [component_list[j][0] for j in num]
         self.predict_result.clear()
         self.main_root = QTreeWidgetItem(self.predict_result)
@@ -1501,7 +1506,6 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         if pred:
             pred_idx = self.pred_names.index(pred)
             mix_data = self.pred_data[pred_idx]
-            # mix_data = mix_data / np.max(mix_data)
             self.fig.axes.plot(self.axis, mix_data, label=pred)
             if component_list:
                 for m in range(len(component_list)):
