@@ -21,6 +21,9 @@ import chardet
 matplotlib.use('Agg')
 
 import matplotlib.pyplot as plt
+
+plt.rc('font', family='Times New Roman')
+
 from tensorflow.python.framework import ops
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
@@ -260,7 +263,7 @@ class TrainNewP(QDialog):
         self.child.save_.setEnabled(False)
 
 
-class TrainHistory(QDialog):
+class TrainReport(QDialog):
     def __init__(self, parameters):
         QDialog.__init__(self)
         self.child = TrainHistory_win.Ui_Dialog()
@@ -272,18 +275,15 @@ class TrainHistory(QDialog):
         self.fig = Myplot(dpi=100)
         self.fig_ntb = NavigationToolbar(self.fig, self)
         self.ax1 = self.fig.axes
-        self.ax1.set_xlabel("Epoch", fontsize=12, color='k')
-        self.ax1.set_ylabel("Loss", fontsize=12, color='k')
         self.ax2 = self.ax1.twinx()
-        self.ax2.set_ylabel("Accuracy", fontsize=12, color='k')
         self.gridlayout = QGridLayout(self.child.groupBox)
         self.gridlayout.addWidget(self.fig)
         self.gridlayout.addWidget(self.fig_ntb)
-        TrainHistory.load(self)
+        TrainReport.load(self)
 
     def load(self):
         self.model = QStandardItemModel(len(self.names), 3)
-        self.model.setHorizontalHeaderLabels(['Component', 'test-Loss', 'test-Acc'])
+        self.model.setHorizontalHeaderLabels(['Component', 'Test Loss', 'Test Acc'])
         for r in range(len(self.names)):
             it_1 = QStandardItem(self.names[r])
             self.model.setItem(r, 0, it_1)
@@ -305,14 +305,17 @@ class TrainHistory(QDialog):
         x_axe = np.arange(1, len(t_loss) + 1)
         self.ax1.cla()
         self.ax2.cla()
-        lns1 = self.ax1.plot(x_axe, t_loss, label='train loss', c='b')
-        lns2 = self.ax1.plot(x_axe, v_loss, label='validation loss', c='g')
-        lns3 = self.ax2.plot(x_axe, t_acc, label='train acc', c='y')
-        lns4 = self.ax2.plot(x_axe, v_acc, label='validation acc', c='r')
+        self.ax1.set_xlabel("Epoch", fontsize=12, color='k')
+        self.ax1.set_ylabel("Loss", fontsize=12, color='g')
+        self.ax2.set_ylabel("Accuracy", fontsize=12, color='r')
+        lns1 = self.ax1.plot(x_axe, t_loss, label='train loss', c='g', linewidth=1)
+        lns2 = self.ax1.plot(x_axe, v_loss, label='validation loss', linestyle=':', c='g', linewidth=1.5)
+        lns3 = self.ax2.plot(x_axe, t_acc, label='train acc', c='r', linewidth=1)
+        lns4 = self.ax2.plot(x_axe, v_acc, label='validation acc', linestyle=':', c='r', linewidth=1.5)
         lns = lns1 + lns2 + lns3 + lns4
         labs = [l.get_label() for l in lns]
         self.ax1.legend(lns, labs, loc=7)
-        self.ax1.set_title(name, fontsize=12, color='b')
+        self.ax1.set_title(name, fontsize=15, color='b')
         self.fig.draw()
 
 
@@ -1272,7 +1275,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             self.textBrowser_3.setText('Finished')
             self.train_on = False
             QtCore.QTimer().singleShot(2000, self.clear_text_1)
-            childwin = TrainHistory(self.train_para)
+            childwin = TrainReport(self.train_para)
             childwin.exec_()
         else:
             QMessageBox.information(self, "Information", m)
