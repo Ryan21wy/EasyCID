@@ -130,7 +130,7 @@ def jcamp_read(filehandle):
                 datatype = rhs
                 continue        ## data starts on next line
             elif (lhs == 'end'):
-                bounds = [int(i) for i   in re_num.findall(rhs)]
+                bounds = [int(i) for i in re_num.findall(rhs)]
                 datastart = True
                 datatype = bounds
                 datalist = []
