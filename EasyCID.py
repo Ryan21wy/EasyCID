@@ -46,6 +46,7 @@ from child_win import TableName_win
 from child_win import ModelSelect_win
 from child_win import QA_win
 from child_win import TrainHistory_win
+from child_win import LinkModels_win
 
 
 def _async_raise(tid, exctype):
@@ -203,7 +204,7 @@ class TrainNewP(QDialog):
         self.child.dir_choose.clicked.connect(self.dir_chose)
         self.child.aug_choose.clicked.connect(self.aug_chose)
         self.child.save_.clicked.connect(self.signal_emit)
-        self.child.reset_.clicked.connect(self.value_reset)
+        self.child.cancel_.clicked.connect(self.cancel)
         self.child.save_.setEnabled(True)
         self.signal = []
         if GroupMI:
@@ -214,9 +215,13 @@ class TrainNewP(QDialog):
             self.child.savepath.setText(GroupMI[4])
         if ComponentMI:
             self.child.number.setValue(ComponentMI[0])
-            self.child.noise.setText(ComponentMI[1])
+            nr1, nr2 = self.extract_num(ComponentMI[1])
+            self.child.noise1.setValue(nr1)
+            self.child.noise2.setValue(nr2)
             self.child.optimizer_.setCurrentIndex(ComponentMI[2])
-            self.child.learnrate.setText(ComponentMI[3])
+            lr1, lr2 = self.extract_num(ComponentMI[3])
+            self.child.lr1.setValue(lr1)
+            self.child.lr2.setValue(lr2)
             self.child.batchsize.setValue(ComponentMI[4])
             self.child.epochs_.setValue(ComponentMI[5])
         if fixed:
@@ -225,6 +230,15 @@ class TrainNewP(QDialog):
             self.child.interval.setEnabled(False)
             self.child.dir_choose.setEnabled(False)
             self.child.aug_choose.setEnabled(False)
+
+    def extract_num(self, num):
+        int_ = abs(int(np.log10(num))) + 1
+        b0 = 10 ** -int_
+        min_ = num / b0
+        if min_ >= 10:
+            int_ = int_ - 1
+            min_ = 1.00
+        return min_, int_
 
     def dir_chose(self):
         last = self.child.savepath.text()
@@ -244,23 +258,30 @@ class TrainNewP(QDialog):
 
     def signal_emit(self):
         self.signal = []
-        self.signal.append(self.child.startshift.value())
-        self.signal.append(self.child.endshift.value())
-        self.signal.append(self.child.interval.value())
-        self.signal.append(self.child.optimizer_.currentIndex())
-        if self.child.learnrate.text().replace(".", '').isdigit():
-            self.signal.append(float(self.child.learnrate.text()))
-        else:
-            QMessageBox.warning(self, "error", 'The learning rate is incorrect\nPlease enter a reasonable value!')
+        start_shift = self.child.startshift.value()
+        end_shift = self.child.endshift.value()
+        interval = self.child.interval.value()
+        if end_shift <= start_shift:
+            QMessageBox.warning(self, "error", 'The end of Raman shift cannot be smaller than the start')
             return
+        elif (end_shift - start_shift) < interval:
+            QMessageBox.warning(self, "error", 'The interval is too big')
+            return
+        self.signal.append(start_shift)
+        self.signal.append(end_shift)
+        self.signal.append(interval)
+        self.signal.append(self.child.optimizer_.currentIndex())
+        lr1 = self.child.lr1.value()
+        lr2 = self.child.lr2.value()
+        lr = lr1 * 10 ** (-lr2)
+        self.signal.append(lr)
         self.signal.append(self.child.batchsize.value())
         self.signal.append(self.child.epochs_.value())
         self.signal.append(self.child.number.value())
-        if self.child.noise.text().replace(".", '').isdigit():
-            self.signal.append(float(self.child.noise.text()))
-        else:
-            QMessageBox.warning(self, "error", 'The noise rate is incorrect\nPlease enter a reasonable value!')
-            return
+        nr1 = self.child.noise1.value()
+        nr2 = self.child.noise2.value()
+        nr = nr1 * 10 ** (-nr2)
+        self.signal.append(nr)
         self.signal.append(self.child.aug_savepath.text())
         if not self.child.savepath.text():
             QMessageBox.warning(self, "error", 'The save path cannot be empty!')
@@ -269,18 +290,8 @@ class TrainNewP(QDialog):
         self.signal_parp.emit(self.signal)
         TrainNewP.close(self)
 
-    def value_reset(self):
-        if self.raman_shift is None:
-            self.child.startshift.setValue(240)
-            self.child.endshift.setValue(2000)
-            self.child.interval.setValue(2)
-        self.child.optimizer_.setCurrentIndex(0)
-        self.child.learnrate.setText("0.00001")
-        self.child.batchsize.setValue(512)
-        self.child.epochs_.setValue(500)
-        self.child.noise.setText("0.005")
-        self.child.number.setValue(30000)
-        self.child.save_.setEnabled(False)
+    def cancel(self):
+        TrainNewP.close(self)
 
 
 class TrainReport(QDialog):
@@ -358,6 +369,78 @@ class ChangeName(QDialog):
 
     def value_reset(self):
         self.child.name.setText(self.init_name)
+
+
+class LinkModels(QDialog):
+    signal_parp = pyqtSignal(list)
+
+    def __init__(self, old_para=None):
+        QDialog.__init__(self)
+        self.child = LinkModels_win.Ui_Dialog()
+        self.child.setupUi(self)
+        if old_para:
+            self.child.startshift.setValue(old_para[0])
+            self.child.endshift.setValue(old_para[1])
+            self.child.interval.setValue(old_para[2])
+        self.child.dir_choose.setIcon(QIcon('./EasyCID_Icon/view.png'))
+        self.child.dir_choose.clicked.connect(self.dir_chose)
+        self.group = old_para[-1]
+        self.child.link_.clicked.connect(self.link)
+        self.child.cancel_.clicked.connect(self.cancel)
+
+    def dir_chose(self):
+        last = self.child.modelpath.text()
+        if last:
+            model_path = QFileDialog.getExistingDirectory(win.centralwidget, "choose model path", last)
+        else:
+            model_path = QFileDialog.getExistingDirectory(win.centralwidget, "choose model path", "C:/")
+        self.child.modelpath.setText(model_path)
+
+    def link(self):
+        signal = []
+        model_path = self.child.modelpath.text()
+        if not model_path:
+            return
+        start_shift = self.child.startshift.value()
+        end_shift = self.child.endshift.value()
+        interval = self.child.interval.value()
+        if end_shift <= start_shift:
+            QMessageBox.warning(self, "error", 'The end of Raman shift cannot be smaller than the start')
+            return
+        elif (end_shift - start_shift) < interval:
+            QMessageBox.warning(self, "error", 'The interval is too big')
+            return
+        correct_models = []
+        x_test = np.arange(start_shift, end_shift, interval).reshape(1, -1)
+        reload_model = cnn_model(x_test)
+        tf.keras.backend.clear_session()
+        ops.reset_default_graph()
+        dir = os.listdir(model_path)
+        for file in dir:
+            path = os.path.join(model_path, file)
+            if os.path.isfile(path) and file.split('.')[-1] == 'h5':
+                try:
+                    reload_model.load_weights(path)
+                    x_test = x_test.reshape(x_test.shape[0], x_test.shape[1], 1)
+                    reload_model.predict(x_test)
+                except Exception as err:
+                    QMessageBox.warning(self, "error", str(err))
+                    return
+                correct_models.append(file.split('.')[0])
+        if not correct_models:
+            QMessageBox.warning(self, "error", 'No available models were found')
+            return
+        signal.append(self.group)
+        signal.append(start_shift)
+        signal.append(end_shift)
+        signal.append(interval)
+        signal.append(model_path)
+        signal.append(correct_models)
+        self.signal_parp.emit(signal)
+        LinkModels.close(self)
+
+    def cancel(self):
+        LinkModels.close(self)
 
 
 class QuantitativeAnalysis(QDialog):
@@ -573,6 +656,7 @@ class PredRun(QThread):
             Xtest_pre = np.zeros(self.x_test.shape)
             for i in range(self.x_test.shape[0]):
                 Xtest_pre[i, :] = self.x_test[i, :] / np.max(self.x_test[i, :])
+            print(Xtest_pre.shape)
             reload_model = cnn_model(Xtest_pre)
             reload_model.compile(optimizer=tf.keras.optimizers.Adam(1e-4),
                                  loss='binary_crossentropy',
@@ -788,6 +872,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.cur = None
         self.GroupMI = None
         self.ComponentMI = None
+        self.link_widget = None
         self.qa.setEnabled(False)
         self.model_ref = {1: 'Yes', 0: 'No'}
         if os.path.exists('./EasyCID.db'):
@@ -933,7 +1018,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         menu = QMenu()
         delete_group = menu.addAction("Delete Group")
         change_group_name = menu.addAction("Change Group Name")
-        link_Models = menu.addAction("Link to Models list")
+        link_Models = menu.addAction("Link Models")
         menu.addSeparator()
         add_spectra = menu.addAction("Add Spectra")
         delete_spectra = menu.addAction("Delete Spectra")
@@ -962,8 +1047,8 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             AppWindow.delete_group(self)
         elif action == change_group_name:
             AppWindow.change_group_name(self, item)
-        elif action == change_group_name:
-            AppWindow.link_Models(self)
+        elif action == link_Models:
+            AppWindow.link_Models(self, item)
         elif action == add_spectra:
             AppWindow.add_spectra(self, item)
         elif action == delete_spectra:
@@ -1153,8 +1238,36 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.cur.execute(sql, (m, current_id))
         self.db.commit()
 
-    def link_Models(self):
-        pass
+    def link_Models(self, item):
+        self.link_widget = item
+        group = item.text(0)
+        sql = 'select Group_ID from Groups where Group_Name=?'
+        group_id = self.cur.execute(sql, (group,)).fetchone()[0]
+        sql = 'select * from Group_Model_Info where From_Group=?'
+        old_para = self.cur.execute(sql, (group_id,)).fetchone()
+        childwin = LinkModels(old_para=old_para)
+        childwin.move(self.geometry().x() + (self.geometry().width() - childwin.width()) // 2,
+                      self.geometry().y() + (self.geometry().height() - childwin.height()) // 2)
+        childwin.signal_parp.connect(self.get_link_signal)
+        childwin.exec_()
+
+    def get_link_signal(self, m):
+        group_id = m[0]
+        correct_models = m[-1]
+        sql = 'select Component_Name from Component_Info where From_Group=?'
+        names_db = self.cur.execute(sql, (group_id,)).fetchall()
+        names = [n[0] for n in names_db]
+        sql = 'update Component_Info set Model=? where Component_Name=? and From_Group=?'
+        for name in names:
+            if name in correct_models:
+                self.cur.execute(sql, (1, name, group_id))
+                self.link_widget.child(names.index(name)).setText(1, self.model_ref[1])
+            else:
+                self.cur.execute(sql, (0, name, group_id))
+                self.link_widget.child(names.index(name)).setText(1, self.model_ref[0])
+        sql = 'update Group_Model_Info set Raman_Start=?, Raman_End=?, Raman_Interval=?, Save_Path=? where From_Group=?'
+        self.cur.execute(sql, (m[1], m[2], m[3], m[4], group_id))
+        self.db.commit()
 
     def click_to_plot(self):
         if self.plot_lock:
@@ -1244,10 +1357,13 @@ class AppWindow(QMainWindow, Ui_MainWindow):
                 self.train_index = [self.train_com_name.index(item.text(0))]
                 sql = 'select Component_ID from Component_Info where Component_Name=? and From_Group=?'
                 index = self.cur.execute(sql, (item.text(0), group_id)).fetchone()[0]
-                sql = 'select * from Component_Model_Info where From_Component=?'
-                ComponentMI = self.cur.execute(sql, (index,)).fetchone()
+                try:
+                    sql = 'select * from Component_Model_Info where From_Component=?'
+                    ComponentMI = self.cur.execute(sql, (index,)).fetchone()
+                except:
+                    ComponentMI = None
                 sql = 'select Component_ID from Component_Info where Model=1 and From_Group=?'
-                jug = self.cur.execute(sql, (item.text(0), group_id)).fetchall()
+                jug = self.cur.execute(sql, (group_id,)).fetchall()
                 if len(jug) >= 2:
                     fixed = True
         else:
@@ -1298,10 +1414,6 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         childwin.exec_()
 
     def get_train_signal(self, m):
-
-        if m[9]:
-            m[9] = os.path.join(m[9], self.train_group)
-        m[10] = os.path.join(m[10], self.train_group)
         self.GroupMI = [m[0], m[1], m[2], m[9], m[10]]
         print(self.GroupMI)
         self.ComponentMI = [m[7], m[8], m[3], m[4], m[5], m[6]]
