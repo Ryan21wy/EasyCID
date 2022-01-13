@@ -27,7 +27,7 @@ class Ui_Dialog(object):
         self.optimizer_.addItem("")
         self.batchsize = QtWidgets.QSpinBox(self.groupBox)
         self.batchsize.setGeometry(QtCore.QRect(130, 100, 151, 31))
-        self.batchsize.setMaximum(999)
+        self.batchsize.setMaximum(999999)
         self.batchsize.setProperty("value", 512)
         self.batchsize.setObjectName("batchsize")
         self.savepath = QtWidgets.QLineEdit(self.groupBox)

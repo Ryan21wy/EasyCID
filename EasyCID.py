@@ -14,14 +14,10 @@ import numpy as np
 import pandas as pd
 import json
 import matplotlib
-import inspect
-import ctypes
 import chardet
 
 matplotlib.use('Agg')
-
 import matplotlib.pyplot as plt
-
 plt.rc('font', family='Times New Roman')
 
 from tensorflow.python.framework import ops
@@ -47,25 +43,6 @@ from child_win import ModelSelect_win
 from child_win import QA_win
 from child_win import TrainHistory_win
 from child_win import LinkModels_win
-
-
-def _async_raise(tid, exctype):
-    """raises the exception, performs cleanup if needed"""
-    tid = ctypes.c_long(tid)
-    if not inspect.isclass(exctype):
-        exctype = type(exctype)
-    res = ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, ctypes.py_object(exctype))
-    if res == 0:
-        raise ValueError("invalid thread id")
-    elif res != 1:
-        # """if it returns a number greater than one, you're in trouble,
-        # and you should call it again with exc=NULL to revert the effect"""
-        ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, None)
-        raise SystemError("PyThreadState_SetAsyncExc failed")
-
-
-def stop_thread(thread):
-    _async_raise(thread.ident, SystemExit)
 
 
 def locate_line(lines, keyword):
@@ -134,62 +111,6 @@ def mkdir(path):
         return True
     else:
         return False
-
-
-def noise(spectrum, nr):
-    N_MAX = nr * np.max(spectrum)
-    Xnoise = np.random.normal(0, N_MAX, (1, spectrum.shape[1]))
-    spectrum_noise = spectrum + Xnoise
-    return np.maximum(spectrum_noise, 0)
-
-
-def component_in(spectrum_raw, component, num, nr=0):
-    c1 = np.random.uniform(0.1, 1, (num, 1))
-    c2 = np.random.rand(num, 1)
-    k = np.random.randint(0, spectrum_raw.shape[0], size=(num, 1))
-
-    a = c2 / c1
-
-    Spectrumdata_new = np.zeros((1, spectrum_raw.shape[1]))
-    component_in = (spectrum_raw[component, :]).reshape((1, spectrum_raw.shape[1]))
-
-    for i in range(num):
-        Spectrumdata_new2 = c1[i] * component_in + c2[i] * spectrum_raw[k[i], :]
-        Spectrumdata_new2 = noise(Spectrumdata_new2, nr)
-        Spectrumdata_new = np.vstack((Spectrumdata_new, Spectrumdata_new2))
-
-    Spectrumdata_new = np.delete(Spectrumdata_new, 0, 0)
-    label = np.ones((num, 1))
-    return {'spectrum_in': Spectrumdata_new, 'label_in': label}
-
-
-def component_out(spectrum_raw, component, num, nr=0):
-    c1 = np.random.rand(num, 1)
-    c2 = np.random.rand(num, 1)
-    a = c2 / c1
-    k = np.random.randint(0, spectrum_raw.shape[0], size=(num, 1))
-    for j in range(num):
-        while k[j] == component:
-            k[j] = np.random.randint(0, spectrum_raw.shape[0])
-    h = np.random.randint(0, spectrum_raw.shape[0], size=(num, 1))
-    for l in range(num):
-        while h[l] == component:
-            h[l] = np.random.randint(0, spectrum_raw.shape[0])
-    Spectrumdata_new = np.zeros((1, spectrum_raw.shape[1]))
-    for i in range(num):
-        Spectrumdata_new2 = c1[i] * spectrum_raw[k[i]] + c2[i] * spectrum_raw[h[i]]
-        Spectrumdata_new2 = noise(Spectrumdata_new2, nr)
-        Spectrumdata_new = np.vstack((Spectrumdata_new, Spectrumdata_new2))
-    Spectrumdata_new = np.delete(Spectrumdata_new, 0, 0)
-    label = np.zeros((num, 1))
-    return {'spectrum_out': Spectrumdata_new, 'label_out': label}
-
-
-def randomize(dataset, labels):
-    permutation = np.random.permutation(labels.shape[0])
-    shuffled_dataset = dataset[permutation, :]
-    shuffled_labels = labels[permutation]
-    return shuffled_dataset, shuffled_labels
 
 
 class TrainNewP(QDialog):
@@ -555,6 +476,52 @@ class TrainRun(QThread):
         Ytest = Y1[int(0.9 * X.shape[0]):X.shape[0]]
         return Xtrain, Xtest, Ytrain, Ytest
 
+    def noise(self, spectrum, nr):
+        N_MAX = nr * np.max(spectrum)
+        Xnoise = np.random.normal(0, N_MAX, (1, spectrum.shape[1]))
+        spectrum_noise = spectrum + Xnoise
+        return np.maximum(spectrum_noise, 0)
+
+    def component_in(self, spectrum_raw, component, num, nr=0):
+        c1 = np.random.uniform(0.1, 1, (num, 1))
+        c2 = np.random.rand(num, 1)
+        k = np.random.randint(0, spectrum_raw.shape[0], size=(num, 1))
+        Spectrumdata_new = np.zeros((1, spectrum_raw.shape[1]))
+        component_in = (spectrum_raw[component, :]).reshape((1, spectrum_raw.shape[1]))
+        for i in range(num):
+            Spectrumdata_new2 = c1[i] * component_in + c2[i] * spectrum_raw[k[i], :]
+            Spectrumdata_new2 = TrainRun.noise(self, Spectrumdata_new2, nr)
+            Spectrumdata_new = np.vstack((Spectrumdata_new, Spectrumdata_new2))
+        Spectrumdata_new = np.delete(Spectrumdata_new, 0, 0)
+        label = np.ones((num, 1))
+        return {'spectrum_in': Spectrumdata_new, 'label_in': label}
+
+    def component_out(self, spectrum_raw, component, num, nr=0):
+        c1 = np.random.rand(num, 1)
+        c2 = np.random.rand(num, 1)
+        k = np.random.randint(0, spectrum_raw.shape[0], size=(num, 1))
+        for j in range(num):
+            while k[j] == component:
+                k[j] = np.random.randint(0, spectrum_raw.shape[0])
+        h = np.random.randint(0, spectrum_raw.shape[0], size=(num, 1))
+        for l in range(num):
+            while h[l] == component:
+                h[l] = np.random.randint(0, spectrum_raw.shape[0])
+        Spectrumdata_new = np.zeros((1, spectrum_raw.shape[1]))
+        for i in range(num):
+            Spectrumdata_new2 = c1[i] * spectrum_raw[k[i]] + c2[i] * spectrum_raw[h[i]]
+            Spectrumdata_new2 = TrainRun.noise(self, Spectrumdata_new2, nr)
+            Spectrumdata_new = np.vstack((Spectrumdata_new, Spectrumdata_new2))
+        Spectrumdata_new = np.delete(Spectrumdata_new, 0, 0)
+        label = np.zeros((num, 1))
+        return {'spectrum_out': Spectrumdata_new, 'label_out': label}
+
+    def randomize(self, dataset, labels):
+        permutation = np.random.permutation(labels.shape[0])
+        shuffled_dataset = dataset[permutation, :]
+        shuffled_labels = labels[permutation]
+        return shuffled_dataset, shuffled_labels
+
     def run(self):
         try:
             self.signal.emit('run')
@@ -571,9 +538,7 @@ class TrainRun(QThread):
             for num in self.count:
                 para_record = []
                 self.process_signal.emit('Augmentation Active (%s/%s) :' % (str(a), str(len(self.count))))
-                print(self.aug_save_path)
                 if self.aug_save_path:
-                    print(11111)
                     mkdir(self.aug_save_path)
                     aug_data_path = os.path.join(self.aug_save_path, self.names[num] + '.npy')
                     aug_label_path = os.path.join(self.aug_save_path, self.names[num] + '_label.npy')
@@ -582,10 +547,12 @@ class TrainRun(QThread):
                         label = np.load(aug_label_path)
                     else:
                         num_sample = self.aug_number
-                        data_in = component_in(spectra_raw, num, num=int(num_sample / 2), nr=self.noise_rate)
+                        data_in = TrainRun.component_in(self, spectra_raw, num,
+                                                        num=int(num_sample / 2), nr=self.noise_rate)
                         Xin = data_in['spectrum_in']
                         Yin = data_in['label_in']
-                        data_out = component_out(spectra_raw, num, num=int(num_sample / 2), nr=self.noise_rate)
+                        data_out = TrainRun.component_out(self, spectra_raw, num,
+                                                          num=int(num_sample / 2), nr=self.noise_rate)
                         Xout = data_out['spectrum_out']
                         Yout = data_out['label_out']
                         spectrum = np.concatenate((Xin, Xout), axis=0)
@@ -593,17 +560,18 @@ class TrainRun(QThread):
                         np.save(aug_data_path, spectrum)
                         np.save(aug_label_path, label)
                 else:
-                    print(22222)
                     num_sample = self.aug_number
-                    data_in = component_in(spectra_raw, num, num=int(num_sample / 2), nr=self.noise_rate)
+                    data_in = TrainRun.component_in(self, spectra_raw, num,
+                                                    num=int(num_sample / 2), nr=self.noise_rate)
                     Xin = data_in['spectrum_in']
                     Yin = data_in['label_in']
-                    data_out = component_out(spectra_raw, num, num=int(num_sample / 2), nr=self.noise_rate)
+                    data_out = TrainRun.component_out(self, spectra_raw, num,
+                                                      num=int(num_sample / 2), nr=self.noise_rate)
                     Xout = data_out['spectrum_out']
                     Yout = data_out['label_out']
                     spectrum = np.concatenate((Xin, Xout), axis=0)
                     label = np.concatenate((Yin, Yout), axis=0)
-                spectrumdata, labeldata = randomize(spectrum, label)
+                spectrumdata, labeldata = TrainRun.randomize(self, spectrum, label)
                 Xtrain, Xtest, Ytrain, Ytest = TrainRun.load_data(self, spectrumdata, labeldata)
                 self.process_signal.emit('Training Active (%s/%s) :' % (str(a), str(len(self.count))))
                 tf.keras.backend.clear_session()
@@ -656,7 +624,6 @@ class PredRun(QThread):
             Xtest_pre = np.zeros(self.x_test.shape)
             for i in range(self.x_test.shape[0]):
                 Xtest_pre[i, :] = self.x_test[i, :] / np.max(self.x_test[i, :])
-            print(Xtest_pre.shape)
             reload_model = cnn_model(Xtest_pre)
             reload_model.compile(optimizer=tf.keras.optimizers.Adam(1e-4),
                                  loss='binary_crossentropy',
@@ -890,15 +857,15 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         webbrowser.open_new_tab(path)
 
     def connect_db(self, path):
-        # try:
+        try:
             self.db = sqlite3.connect(path)
             self.db.execute('pragma foreign_keys=on')
             self.cur = self.db.cursor()
             abs_bath = os.path.abspath(path)
             self.modelPath.setTitle('Current Database: "%s"' % abs_bath)
             AppWindow.db_data_display(self)
-        # except Exception as err:
-        #     QMessageBox.information(self, "Information", str(err))
+        except Exception as err:
+            QMessageBox.information(self, "Error", str(err))
 
     def set_up_db(self):
         file_name, _ = QFileDialog.getSaveFileName(self.centralwidget, "Build database", "C:/", 'database (*.db)')
@@ -943,7 +910,6 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         for id in group_ids:
             sql = 'select Component_Name,Model from Component_Info where From_Group=?'
             component_info = cur.execute(sql, (id,)).fetchall()
-            print(component_info)
             components_info.append(component_info)
         return group_names, components_info
 
@@ -951,7 +917,6 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         if not self.db:
             return
         group_names, components_info = AppWindow.get_db_data(self, self.cur)
-        print(components_info)
         if group_names is None:
             self.data_display.clear()
             return
@@ -962,7 +927,6 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             root = QTreeWidgetItem(self.data_display)
             root.setText(0, group_name)
             for column in component_info:
-                print(column)
                 child = QTreeWidgetItem()
                 child.setText(0, column[0])
                 child.setText(1, self.model_ref[column[1]])
@@ -989,14 +953,13 @@ class AppWindow(QMainWindow, Ui_MainWindow):
                     pass
             return np.array(x), np.array(y)
         except Exception as err:
-            print(str(err))
-        return None, None
+            QMessageBox.information(self, "Error", str(err))
+            return None, None
 
     def open_dir_func(self):
         self.data_path = QFileDialog.getExistingDirectory(self.centralwidget, "选取文件夹", "C:/")
         if not self.data_path:
             return
-        dir = os.listdir(self.data_path)
         self.mix_list = []
         self.mix_data['x'] = []
         self.mix_data['y'] = []
@@ -1386,7 +1349,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
                 elif reply == QMessageBox.No:
                     sql = 'select Component_Name from Component_Info where Model=0 and From_Group=?'
                     components = self.cur.execute(sql, (group_id,)).fetchall()
-                    if not self.train_index:
+                    if not components:
                         return
                     for com in components:
                         self.train_index.append(self.train_com_name.index(com[0]))
@@ -1415,9 +1378,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
 
     def get_train_signal(self, m):
         self.GroupMI = [m[0], m[1], m[2], m[9], m[10]]
-        print(self.GroupMI)
         self.ComponentMI = [m[7], m[8], m[3], m[4], m[5], m[6]]
-        print(self.ComponentMI)
         self.model_path = m[-1]
         self.t_new_axis = np.linspace(m[0], m[1], int((m[1] - m[0]) / m[2] + 1))
         AppWindow.train_run(self, m[3:], self.train_index, self.t_axis, self.t_new_axis)
