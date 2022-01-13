@@ -40,7 +40,7 @@ from EasyCID_MainWindow import Ui_MainWindow
 from child_win import TrainNewP_win
 from child_win import TableName_win
 from child_win import ModelSelect_win
-from child_win import QA_win
+from child_win import RatioEstimation_win
 from child_win import TrainHistory_win
 from child_win import LinkModels_win
 
@@ -150,7 +150,6 @@ class TrainNewP(QDialog):
             self.child.endshift.setEnabled(False)
             self.child.interval.setEnabled(False)
             self.child.dir_choose.setEnabled(False)
-            self.child.aug_choose.setEnabled(False)
 
     def extract_num(self, num):
         int_ = abs(int(np.log10(num))) + 1
@@ -299,12 +298,13 @@ class LinkModels(QDialog):
         QDialog.__init__(self)
         self.child = LinkModels_win.Ui_Dialog()
         self.child.setupUi(self)
-        if old_para:
+        if len(old_para) > 1:
             self.child.startshift.setValue(old_para[0])
             self.child.endshift.setValue(old_para[1])
             self.child.interval.setValue(old_para[2])
         self.child.dir_choose.setIcon(QIcon('./EasyCID_Icon/view.png'))
         self.child.dir_choose.clicked.connect(self.dir_chose)
+        print(old_para)
         self.group = old_para[-1]
         self.child.link_.clicked.connect(self.link)
         self.child.cancel_.clicked.connect(self.cancel)
@@ -364,12 +364,12 @@ class LinkModels(QDialog):
         LinkModels.close(self)
 
 
-class QuantitativeAnalysis(QDialog):
+class RatioEstimation(QDialog):
     signal_parp = pyqtSignal(dict)
 
     def __init__(self):
         QDialog.__init__(self)
-        self.child = QA_win.Ui_dialog()
+        self.child = RatioEstimation_win.Ui_dialog()
         self.child.setupUi(self)
 
         self.widget_1(False)
@@ -378,6 +378,7 @@ class QuantitativeAnalysis(QDialog):
         self.child.OK.clicked.connect(self.signal_emit)
         self.child.checkBox.stateChanged.connect(self.checkBox_state)
         self.child.checkBox_2.stateChanged.connect(self.checkBox_2_state)
+        self.child.cancel_.clicked.connect(self.cancel)
 
     def widget_1(self, state=False):
         self.child.label_2.setEnabled(state)
@@ -418,10 +419,13 @@ class QuantitativeAnalysis(QDialog):
         en_param.append(self.child.EN_iter.text())
         param['en'] = en_param
         self.signal_parp.emit(param)
-        QuantitativeAnalysis.close(self)
+        RatioEstimation.close(self)
+
+    def cancel(self):
+        RatioEstimation.close(self)
 
 
-class PredictionRun(QDialog):
+class PredictionSetting(QDialog):
     signal_parp = pyqtSignal(list)
 
     def __init__(self, table_list):
@@ -431,6 +435,7 @@ class PredictionRun(QDialog):
         for item in table_list:
             self.child.comboBox.addItem(item)
         self.child.OK.clicked.connect(self.signal_emit)
+        self.child.cancel_.clicked.connect(self.cancel)
 
     def signal_emit(self):
         signal = []
@@ -439,7 +444,10 @@ class PredictionRun(QDialog):
         signal.append(table)
         signal.append(threshold)
         self.signal_parp.emit(signal)
-        PredictionRun.close(self)
+        PredictionSetting.close(self)
+
+    def cancel(self):
+        PredictionSetting.close(self)
 
 
 class TrainRun(QThread):
@@ -1206,8 +1214,11 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         group = item.text(0)
         sql = 'select Group_ID from Groups where Group_Name=?'
         group_id = self.cur.execute(sql, (group,)).fetchone()[0]
+        print(group_id)
         sql = 'select * from Group_Model_Info where From_Group=?'
         old_para = self.cur.execute(sql, (group_id,)).fetchone()
+        if not old_para:
+            old_para = [group_id]
         childwin = LinkModels(old_para=old_para)
         childwin.move(self.geometry().x() + (self.geometry().width() - childwin.width()) // 2,
                       self.geometry().y() + (self.geometry().height() - childwin.height()) // 2)
@@ -1228,8 +1239,15 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             else:
                 self.cur.execute(sql, (0, name, group_id))
                 self.link_widget.child(names.index(name)).setText(1, self.model_ref[0])
-        sql = 'update Group_Model_Info set Raman_Start=?, Raman_End=?, Raman_Interval=?, Save_Path=? where From_Group=?'
-        self.cur.execute(sql, (m[1], m[2], m[3], m[4], group_id))
+        sql = 'select * from Group_Model_Info where From_Group=?'
+        old_para = self.cur.execute(sql, (group_id,)).fetchone()
+        if not old_para:
+            sql = 'insert into Group_Model_Info VALUES (?,?,?,?,?,?)'
+            self.cur.execute(sql, (m[1], m[2], m[3], '', m[4], group_id))
+        else:
+            sql = 'update Group_Model_Info set Raman_Start=?, Raman_End=?, Raman_Interval=?, Save_Path=? where ' \
+                  'From_Group=? '
+            self.cur.execute(sql, (m[1], m[2], m[3], m[4], group_id))
         self.db.commit()
 
     def click_to_plot(self):
@@ -1500,7 +1518,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.cur.execute(sql)
         tab_name_db = self.cur.fetchall()
         tab_names = [line[0] for line in tab_name_db]
-        childwin = PredictionRun(tab_names)
+        childwin = PredictionSetting(tab_names)
         childwin.signal_parp.connect(self.predict_process)
         childwin.exec_()
 
@@ -1587,7 +1605,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             return
         if not self.db:
             return
-        childwin = QuantitativeAnalysis()
+        childwin = RatioEstimation()
         childwin.signal_parp.connect(self.quantitative_analysis)
         childwin.exec_()
 
