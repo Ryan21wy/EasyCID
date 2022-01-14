@@ -320,7 +320,6 @@ class LinkModels(QDialog):
             try:
                 with open(info_path, 'r') as fp:
                     info = json.load(fp)
-                print(info)
                 self.child.startshift.setValue(info['start'])
                 self.child.endshift.setValue(info['end'])
                 self.child.interval.setValue(info['interval'])
