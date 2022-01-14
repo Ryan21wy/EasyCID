@@ -50,6 +50,7 @@ class Ui_Dialog(object):
         self.modelpath = QtWidgets.QLineEdit(Dialog)
         self.modelpath.setGeometry(QtCore.QRect(120, 150, 131, 31))
         self.modelpath.setObjectName("modelpath")
+        self.modelpath.setFocusPolicy(QtCore.Qt.NoFocus)
         self.link_ = QtWidgets.QPushButton(Dialog)
         self.link_.setEnabled(True)
         self.link_.setGeometry(QtCore.QRect(30, 200, 93, 28))
@@ -63,7 +64,7 @@ class Ui_Dialog(object):
 
     def retranslateUi(self, Dialog):
         _translate = QtCore.QCoreApplication.translate
-        Dialog.setWindowTitle(_translate("Dialog", "Dialog"))
+        Dialog.setWindowTitle(_translate("Dialog", "Load Models"))
         self.groupBox_3.setTitle(_translate("Dialog", "Raman Shift"))
         self.label_12.setText(_translate("Dialog", "Start"))
         self.label_13.setText(_translate("Dialog", "End"))

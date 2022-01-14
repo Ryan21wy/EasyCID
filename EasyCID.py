@@ -304,7 +304,6 @@ class LinkModels(QDialog):
             self.child.interval.setValue(old_para[2])
         self.child.dir_choose.setIcon(QIcon('./EasyCID_Icon/view.png'))
         self.child.dir_choose.clicked.connect(self.dir_chose)
-        print(old_para)
         self.group = old_para[-1]
         self.child.link_.clicked.connect(self.link)
         self.child.cancel_.clicked.connect(self.cancel)
@@ -1214,7 +1213,6 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         group = item.text(0)
         sql = 'select Group_ID from Groups where Group_Name=?'
         group_id = self.cur.execute(sql, (group,)).fetchone()[0]
-        print(group_id)
         sql = 'select * from Group_Model_Info where From_Group=?'
         old_para = self.cur.execute(sql, (group_id,)).fetchone()
         if not old_para:
@@ -1226,6 +1224,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         childwin.exec_()
 
     def get_link_signal(self, m):
+        QApplication.processEvents()
         group_id = m[0]
         correct_models = m[-1]
         sql = 'select Component_Name from Component_Info where From_Group=?'
@@ -1249,6 +1248,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
                   'From_Group=? '
             self.cur.execute(sql, (m[1], m[2], m[3], m[4], group_id))
         self.db.commit()
+        QMessageBox.information(self, "Information", 'Complete Load Models')
 
     def click_to_plot(self):
         if self.plot_lock:
