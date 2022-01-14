@@ -315,6 +315,19 @@ class LinkModels(QDialog):
         else:
             model_path = QFileDialog.getExistingDirectory(win.centralwidget, "choose model path", "C:/")
         self.child.modelpath.setText(model_path)
+        info_path = os.path.join(model_path, 'ModelsInfo.json')
+        if os.path.exists(info_path):
+            try:
+                with open(info_path, 'r') as fp:
+                    info = json.load(fp)
+                print(info)
+                self.child.startshift.setValue(info['start'])
+                self.child.endshift.setValue(info['end'])
+                self.child.interval.setValue(info['interval'])
+            except:
+                return
+        else:
+            return
 
     def link(self):
         signal = []
@@ -829,6 +842,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.pred_param = {}
         self.data_name = []
         self.c_data_list = []
+        self.candidate_model = []
         self.raman_shift_para = []
         self.train_com_name = []
         self.train_com_spec = []
@@ -1399,6 +1413,10 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.ComponentMI = [m[7], m[8], m[3], m[4], m[5], m[6]]
         self.model_path = m[-1]
         self.t_new_axis = np.linspace(m[0], m[1], int((m[1] - m[0]) / m[2] + 1))
+        model_info = {'start': m[0], 'end': m[1], 'interval': m[2]}
+        info_path = os.path.join(self.model_path, 'ModelsInfo.json')
+        with open(info_path, 'w') as fp:
+            json.dump(model_info, fp)
         AppWindow.train_run(self, m[3:], self.train_index, self.t_axis, self.t_new_axis)
 
     def train_run(self, sp, count, axis, new_axis):
@@ -1529,16 +1547,27 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.threshold = m[1]
         sql = 'select Group_ID from Groups where Group_Name=?'
         group_id = self.cur.execute(sql, (self.pred_group,)).fetchone()[0]
+        sql = 'select Component_Name from Component_Info where Model=1 and From_Group=?'
+        component_db = self.cur.execute(sql, (group_id,)).fetchall()
+        component_list = [c[0] for c in component_db]
         sql = 'select * from Group_Model_Info where From_Group=?'
         group_para = self.cur.execute(sql, (group_id,)).fetchone()
         if not group_para:
             QMessageBox.information(self, "Information", 'No available models')
             return
         self.axis = np.arange(group_para[0], group_para[1], group_para[2])
+        self.candidate_model = []
         model_path_list = []
         dir = os.listdir(group_para[-2])
         for file in dir:
-            model_path_list.append(os.path.join(group_para[-2], file))
+            if os.path.isfile(os.path.join(group_para[-2], file)):
+                [name, type] = file.split('.')
+                if (name in component_list) and (type == 'h5'):
+                    model_path_list.append(os.path.join(group_para[-2], file))
+                    self.candidate_model.append(name)
+        if not model_path_list:
+            QMessageBox.information(self, "Information", 'No available models')
+            return
         self.pred_data = self.get_pred_data(self.axis)
         if self.pred_data is None:
             QMessageBox.information(self, "Information", 'Missing spectra to be analyzed')
@@ -1576,13 +1605,9 @@ class AppWindow(QMainWindow, Ui_MainWindow):
     def get_pred_data_signal(self, m):
         self.pred_prob = np.asarray(m)
         self.result_list = {}
-        sql = 'select Group_ID from Groups where Group_Name=?'
-        group_id = self.cur.execute(sql, (self.pred_group,)).fetchone()[0]
-        sql = 'select Component_Name from Component_Info where Model=1 and From_Group=?'
-        component_list = self.cur.execute(sql, (group_id,)).fetchall()
         for i in range(len(self.pred_names)):
             num = np.where(self.pred_prob[:, i] >= self.threshold)[0]
-            self.result_list[self.pred_names[i]] = [component_list[j][0] for j in num]
+            self.result_list[self.pred_names[i]] = [self.candidate_model[n] for n in num]
         self.predict_result.clear()
         self.main_root = QTreeWidgetItem(self.predict_result)
         self.main_root.setText(0, 'results')
