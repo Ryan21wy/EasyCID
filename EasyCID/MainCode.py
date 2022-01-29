@@ -1,5 +1,8 @@
 import os
 import sys
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import tensorflow as tf
 
 if hasattr(sys, 'frozen'):
@@ -11,14 +14,12 @@ sess = tf.compat.v1.Session(config=config)
 import webbrowser
 import sqlite3
 import numpy as np
-import pandas as pd
 import json
 import matplotlib
-import chardet
 
 matplotlib.use('Agg')
+
 import matplotlib.pyplot as plt
-plt.rc('font', family='Times New Roman')
 
 from tensorflow.python.framework import ops
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -31,97 +32,32 @@ from PyQt5.QtCore import QThread, QStringListModel, pyqtSignal
 from PyQt5.QtGui import QIcon, QStandardItemModel, QStandardItem
 from matplotlib.figure import Figure
 from sklearn.linear_model import enet_path
-# local package
-from spc.spcio import readSPC
-import jcamp
-from AirPLS import airPLS, WhittakerSmooth
+# local packages
+from EasyCID.readFile.spc.spcio import readSPC
+from EasyCID.readFile import jcamp
+from EasyCID.readFile.readTXT import parseBWTekFile, read_simple_txt
+from EasyCID.Training.cnn_model_tf import cnn_model
+from EasyCID.Training.data_augmentation import data_augment
+from EasyCID.Training.spilt_dataset import spilt_dataset
+from EasyCID.Prediction.AirPLS import airPLS, WhittakerSmooth
+from EasyCID.Utils.makeDir import mkdir
+from EasyCID.Utils.makeEXCEL import make_excel
+from EasyCID.Utils.database import EasyCIDDatabase as EasyDB
 # windows of EasyCID
-from EasyCID_MainWindow import Ui_MainWindow
-from child_win import TrainNewP_win
-from child_win import TableName_win
-from child_win import ModelSelect_win
-from child_win import RatioEstimation_win
-from child_win import TrainHistory_win
-from child_win import LinkModels_win
+from EasyCID.Windows.MainWindow import Ui_MainWindow
+from EasyCID.Windows import TableName_win, PredictionParameter_win, LinkModels_win, TrainingReport_win, \
+    RatioEstimation_win, TrainingParameter_win
 
 
-def locate_line(lines, keyword):
-    for i in range(0, len(lines)):
-        fr = lines[i].find(keyword)
-        if fr != -1:
-            return i
-    return "CAN'T FIND";
-
-
-def parseBWTekFile(filepath, filename, select_ramanshift=False, xname='Raman Shift', yname="Dark Subtracted #1"):
-    file_content = open(filepath).read()
-    fc_splits = file_content.split('\n')
-    spectrum = {}
-    spectrum['name'] = filename[0:(len(filename) - 4)]
-    spectrum['excition'] = float(fc_splits[locate_line(fc_splits, 'laser_wavelength')].split(';')[1])
-    spectrum['integral_time'] = float(fc_splits[locate_line(fc_splits, 'intigration times')].split(';')[1])
-
-    nTitle = locate_line(fc_splits, xname)
-
-    Xunit = fc_splits[nTitle].split(';')
-    AXI = Xunit.index(xname)
-    DSI = Xunit.index(yname)
-    xaxis_min = nTitle + 1 + int(fc_splits[locate_line(fc_splits, 'xaxis_min')].split(';')[1])
-    xaxis_max = nTitle + 1 + int(fc_splits[locate_line(fc_splits, 'xaxis_max')].split(';')[1])
-
-    nLen = xaxis_max - xaxis_min
-    spectrum["axis"] = np.zeros((nLen,), dtype=np.float64)
-    spectrum["spectrum"] = np.zeros((nLen,), dtype=np.float64)
-    for i in range(xaxis_min, xaxis_max):
-        fc_ss = fc_splits[i].split(';')
-        spectrum["axis"][i - xaxis_min] = float(fc_ss[AXI])
-        spectrum["spectrum"][i - xaxis_min] = float(fc_ss[DSI])
-    if select_ramanshift:
-        inds = np.logical_and(spectrum["axis"] > 160, spectrum["axis"] < 3000)
-        spectrum["axis"] = spectrum["axis"][inds]
-        spectrum["spectrum"] = spectrum["spectrum"][inds].astype(np.float64)
-    return spectrum
-
-
-def cnn_model(x_train):
-    return tf.keras.models.Sequential([
-        tf.keras.layers.Conv1D(input_shape=(x_train.shape[1], 1), filters=32, kernel_size=(3), strides=(2),
-                               padding='SAME', kernel_initializer=tf.keras.initializers.he_normal(), use_bias=False),
-        tf.keras.layers.BatchNormalization(), 
-        tf.keras.layers.Activation('relu'),
-        tf.keras.layers.MaxPool1D(pool_size=(2)),
-        tf.keras.layers.Conv1D(input_shape=(x_train.shape[1] / 2, 32), filters=64, kernel_size=(3), strides=(2),
-                               padding='SAME', kernel_initializer=tf.keras.initializers.he_normal(), use_bias=False),
-        tf.keras.layers.BatchNormalization(),
-        tf.keras.layers.Activation('relu'),
-        tf.keras.layers.MaxPool1D(pool_size=(2)),
-        tf.keras.layers.Flatten(),
-        tf.keras.layers.Dense(512, activation='relu', kernel_initializer=tf.keras.initializers.he_normal()),
-        tf.keras.layers.Dropout(0.5),
-        tf.keras.layers.Dense(1, activation='sigmoid')
-    ])
-
-
-def mkdir(path):
-    path = path.strip()
-    path = path.rstrip("\\")
-    isExists = os.path.exists(path)
-    if not isExists:
-        os.makedirs(path)
-        return True
-    else:
-        return False
-
-
-class TrainNewP(QDialog):
+class TrainingParameterSetting(QDialog):
     signal_parp = pyqtSignal(list)
 
     def __init__(self, GroupMI=None, ComponentMI=None, fixed=False):
         QDialog.__init__(self)
-        self.child = TrainNewP_win.Ui_Dialog()
+        self.child = TrainingParameter_win.Ui_Dialog()
         self.child.setupUi(self)
-        self.child.dir_choose.setIcon(QIcon('./EasyCID_Icon/view.png'))
-        self.child.aug_choose.setIcon(QIcon('./EasyCID_Icon/view.png'))
+        self.child.dir_choose.setIcon(QIcon('Icon/view.png'))
+        self.child.aug_choose.setIcon(QIcon('Icon/view.png'))
         self.child.dir_choose.clicked.connect(self.dir_chose)
         self.child.aug_choose.clicked.connect(self.aug_chose)
         self.child.save_.clicked.connect(self.signal_emit)
@@ -208,16 +144,16 @@ class TrainNewP(QDialog):
             return
         self.signal.append(self.child.savepath.text())
         self.signal_parp.emit(self.signal)
-        TrainNewP.close(self)
+        TrainingParameterSetting.close(self)
 
     def cancel(self):
-        TrainNewP.close(self)
+        TrainingParameterSetting.close(self)
 
 
-class TrainReport(QDialog):
+class TrainingReport(QDialog):
     def __init__(self, parameters):
         QDialog.__init__(self)
-        self.child = TrainHistory_win.Ui_Dialog()
+        self.child = TrainingReport_win.Ui_Dialog()
         self.child.setupUi(self)
         self.parameters = parameters
         self.names = list(parameters.keys())
@@ -230,7 +166,7 @@ class TrainReport(QDialog):
         self.gridlayout = QGridLayout(self.child.groupBox)
         self.gridlayout.addWidget(self.fig)
         self.gridlayout.addWidget(self.fig_ntb)
-        TrainReport.load(self)
+        TrainingReport.load(self)
 
     def load(self):
         self.model = QStandardItemModel(len(self.names), 3)
@@ -302,7 +238,7 @@ class LinkModels(QDialog):
             self.child.startshift.setValue(old_para[0])
             self.child.endshift.setValue(old_para[1])
             self.child.interval.setValue(old_para[2])
-        self.child.dir_choose.setIcon(QIcon('./EasyCID_Icon/view.png'))
+        self.child.dir_choose.setIcon(QIcon('Icon/view.png'))
         self.child.dir_choose.clicked.connect(self.dir_chose)
         self.group = old_para[-1]
         self.child.link_.clicked.connect(self.link)
@@ -375,7 +311,7 @@ class LinkModels(QDialog):
         LinkModels.close(self)
 
 
-class RatioEstimation(QDialog):
+class RatioEstimationSetting(QDialog):
     signal_parp = pyqtSignal(dict)
 
     def __init__(self):
@@ -430,10 +366,10 @@ class RatioEstimation(QDialog):
         en_param.append(self.child.EN_iter.text())
         param['en'] = en_param
         self.signal_parp.emit(param)
-        RatioEstimation.close(self)
+        RatioEstimationSetting.close(self)
 
     def cancel(self):
-        RatioEstimation.close(self)
+        RatioEstimationSetting.close(self)
 
 
 class PredictionSetting(QDialog):
@@ -441,7 +377,7 @@ class PredictionSetting(QDialog):
 
     def __init__(self, table_list):
         QDialog.__init__(self)
-        self.child = ModelSelect_win.Ui_dialog()
+        self.child = PredictionParameter_win.Ui_dialog()
         self.child.setupUi(self)
         for item in table_list:
             self.child.comboBox.addItem(item)
@@ -461,7 +397,7 @@ class PredictionSetting(QDialog):
         PredictionSetting.close(self)
 
 
-class TrainRun(QThread):
+class TrainingRun(QThread):
     process_signal = pyqtSignal(str)
     signal = pyqtSignal(str)
     err_signal = pyqtSignal(str)
@@ -483,64 +419,6 @@ class TrainRun(QThread):
         self.axis = info_para[3]
         self.new_axis = info_para[4]
 
-    def load_data(self, X, Y1):
-        for i in range(X.shape[0]):
-            X[i, :] = (X[i, :] - np.min(X[i, :])) / (np.max(X[i, :]) - np.min(X[i, :]))
-        Xtrain = X[0:int(0.9 * X.shape[0])]
-        Xtest = X[int(0.9 * X.shape[0]):X.shape[0]]
-        Xtrain = Xtrain.reshape(Xtrain.shape[0], Xtrain.shape[1], 1)
-        Xtest = Xtest.reshape(Xtest.shape[0], Xtest.shape[1], 1)
-
-        Ytrain = Y1[0:int(0.9 * X.shape[0])]
-        Ytest = Y1[int(0.9 * X.shape[0]):X.shape[0]]
-        return Xtrain, Xtest, Ytrain, Ytest
-
-    def noise(self, spectrum, nr):
-        N_MAX = nr * np.max(spectrum)
-        Xnoise = np.random.normal(0, N_MAX, (1, spectrum.shape[1]))
-        spectrum_noise = spectrum + Xnoise
-        return np.maximum(spectrum_noise, 0)
-
-    def component_in(self, spectrum_raw, component, num, nr=0):
-        c1 = np.random.uniform(0.1, 1, (num, 1))
-        c2 = np.random.rand(num, 1)
-        k = np.random.randint(0, spectrum_raw.shape[0], size=(num, 1))
-        Spectrumdata_new = np.zeros((1, spectrum_raw.shape[1]))
-        component_in = (spectrum_raw[component, :]).reshape((1, spectrum_raw.shape[1]))
-        for i in range(num):
-            Spectrumdata_new2 = c1[i] * component_in + c2[i] * spectrum_raw[k[i], :]
-            Spectrumdata_new2 = TrainRun.noise(self, Spectrumdata_new2, nr)
-            Spectrumdata_new = np.vstack((Spectrumdata_new, Spectrumdata_new2))
-        Spectrumdata_new = np.delete(Spectrumdata_new, 0, 0)
-        label = np.ones((num, 1))
-        return {'spectrum_in': Spectrumdata_new, 'label_in': label}
-
-    def component_out(self, spectrum_raw, component, num, nr=0):
-        c1 = np.random.rand(num, 1)
-        c2 = np.random.rand(num, 1)
-        k = np.random.randint(0, spectrum_raw.shape[0], size=(num, 1))
-        for j in range(num):
-            while k[j] == component:
-                k[j] = np.random.randint(0, spectrum_raw.shape[0])
-        h = np.random.randint(0, spectrum_raw.shape[0], size=(num, 1))
-        for l in range(num):
-            while h[l] == component:
-                h[l] = np.random.randint(0, spectrum_raw.shape[0])
-        Spectrumdata_new = np.zeros((1, spectrum_raw.shape[1]))
-        for i in range(num):
-            Spectrumdata_new2 = c1[i] * spectrum_raw[k[i]] + c2[i] * spectrum_raw[h[i]]
-            Spectrumdata_new2 = TrainRun.noise(self, Spectrumdata_new2, nr)
-            Spectrumdata_new = np.vstack((Spectrumdata_new, Spectrumdata_new2))
-        Spectrumdata_new = np.delete(Spectrumdata_new, 0, 0)
-        label = np.zeros((num, 1))
-        return {'spectrum_out': Spectrumdata_new, 'label_out': label}
-
-    def randomize(self, dataset, labels):
-        permutation = np.random.permutation(labels.shape[0])
-        shuffled_dataset = dataset[permutation, :]
-        shuffled_labels = labels[permutation]
-        return shuffled_dataset, shuffled_labels
-
     def run(self):
         try:
             self.signal.emit('run')
@@ -550,48 +428,28 @@ class TrainRun(QThread):
             for i in range(count):
                 spectrum = np.interp(self.new_axis, self.axis[i], self.spectra[i]).astype(np.float64).copy()
                 new_spectra.append([self.names[i], spectrum])
-                # spectrum = spectrum / np.max(spectrum)
+                spectrum = spectrum / np.max(spectrum)
                 Spectrumdata = np.vstack((Spectrumdata, spectrum.T))
             spectra_raw = np.delete(Spectrumdata, 0, 0)
             a = 1
-            for num in self.count:
+            for com in self.count:
+                print(self.count)
                 para_record = []
                 self.process_signal.emit('Augmentation Active (%s/%s) :' % (str(a), str(len(self.count))))
                 if self.aug_save_path:
                     mkdir(self.aug_save_path)
-                    aug_data_path = os.path.join(self.aug_save_path, self.names[num] + '.npy')
-                    aug_label_path = os.path.join(self.aug_save_path, self.names[num] + '_label.npy')
+                    aug_data_path = os.path.join(self.aug_save_path, self.names[com] + '.npy')
+                    aug_label_path = os.path.join(self.aug_save_path, self.names[com] + '_label.npy')
                     if os.path.isfile(aug_data_path):
                         spectrum = np.load(aug_data_path)
                         label = np.load(aug_label_path)
                     else:
-                        num_sample = self.aug_number
-                        data_in = TrainRun.component_in(self, spectra_raw, num,
-                                                        num=int(num_sample / 2), nr=self.noise_rate)
-                        Xin = data_in['spectrum_in']
-                        Yin = data_in['label_in']
-                        data_out = TrainRun.component_out(self, spectra_raw, num,
-                                                          num=int(num_sample / 2), nr=self.noise_rate)
-                        Xout = data_out['spectrum_out']
-                        Yout = data_out['label_out']
-                        spectrum = np.concatenate((Xin, Xout), axis=0)
-                        label = np.concatenate((Yin, Yout), axis=0)
+                        spectrum, label = data_augment(spectra_raw, com, num=self.aug_number, nr=self.noise_rate)
                         np.save(aug_data_path, spectrum)
                         np.save(aug_label_path, label)
                 else:
-                    num_sample = self.aug_number
-                    data_in = TrainRun.component_in(self, spectra_raw, num,
-                                                    num=int(num_sample / 2), nr=self.noise_rate)
-                    Xin = data_in['spectrum_in']
-                    Yin = data_in['label_in']
-                    data_out = TrainRun.component_out(self, spectra_raw, num,
-                                                      num=int(num_sample / 2), nr=self.noise_rate)
-                    Xout = data_out['spectrum_out']
-                    Yout = data_out['label_out']
-                    spectrum = np.concatenate((Xin, Xout), axis=0)
-                    label = np.concatenate((Yin, Yout), axis=0)
-                spectrumdata, labeldata = TrainRun.randomize(self, spectrum, label)
-                Xtrain, Xtest, Ytrain, Ytest = TrainRun.load_data(self, spectrumdata, labeldata)
+                    spectrum, label = data_augment(spectra_raw, com, num=self.aug_number, nr=self.noise_rate)
+                Xtrain, Xtest, Ytrain, Ytest = spilt_dataset(spectrum, label)
                 self.process_signal.emit('Training Active (%s/%s) :' % (str(a), str(len(self.count))))
                 tf.keras.backend.clear_session()
                 ops.reset_default_graph()
@@ -609,7 +467,7 @@ class TrainRun(QThread):
                 history = model.fit(Xtrain, Ytrain, batch_size=self.batch_size, epochs=self.epochs,
                                     validation_split=0.1, verbose=0, callbacks=callback)
                 loss, acc = model.evaluate(Xtest, Ytest, verbose=0)
-                para_record.append(self.names[num])
+                para_record.append(self.names[com])
                 para_record.append(history.history['loss'])
                 para_record.append(history.history['accuracy'])
                 para_record.append(history.history['val_loss'])
@@ -617,10 +475,10 @@ class TrainRun(QThread):
                 para_record.append(loss)
                 para_record.append(acc)
                 mkdir(self.model_path)
-                model.save_weights(os.path.join(self.model_path, self.names[num] + '.h5'))
+                model.save_weights(os.path.join(self.model_path, self.names[com] + '.h5'))
 
                 del model
-                self.data_signal.emit(new_spectra[num])
+                self.data_signal.emit(new_spectra[com])
                 self.para_signal.emit(para_record)
                 a += 1
             self.signal.emit('finished')
@@ -628,7 +486,7 @@ class TrainRun(QThread):
             self.err_signal.emit(str(err))
 
 
-class PredRun(QThread):
+class PredictionRun(QThread):
     signal = pyqtSignal(str)
     data_signal = pyqtSignal(list)
 
@@ -661,7 +519,7 @@ class PredRun(QThread):
             self.signal.emit(str(err))
 
 
-class QARun(QThread):
+class RatioEstimationRun(QThread):
     signal = pyqtSignal(str)
     rate_signal = pyqtSignal(list)
 
@@ -716,26 +574,7 @@ class EXCELCreate(QThread):
     def run(self):
         try:
             self.signal.emit('run')
-            data = []
-            if self.c_list:
-                for i in range(len(self.pred_names)):
-                    mix = self.pred_names[i]
-                    for j in range(len(self.pred_list[mix])):
-                        if j == 0:
-                            data.append([mix, self.pred_list[mix][j], self.c_list[i][j]])
-                        else:
-                            data.append([' ', self.pred_list[mix][j], self.c_list[i][j]])
-                df = pd.DataFrame(data, columns=['Mixture', 'Component', 'Ratio'])
-            else:
-                for i in range(len(self.pred_names)):
-                    mix = self.pred_names[i]
-                    for j in range(len(self.pred_list[mix])):
-                        if j == 0:
-                            data.append([mix, self.pred_list[mix][j]])
-                        else:
-                            data.append([' ', self.pred_list[mix][j]])
-                df = pd.DataFrame(data, columns=['mixture', 'component'])
-            df.to_excel(self.save_path, index=False)
+            make_excel(self.pred_names, self.pred_list, self.save_path, ratios=self.c_list)
             self.signal.emit('finish')
         except Exception as err:
             self.signal.emit(str(err))
@@ -743,6 +582,7 @@ class EXCELCreate(QThread):
 
 class Myplot(FigureCanvas):
     def __init__(self, dpi=100):
+        plt.rc('font', family='Times New Roman')
         plt.rcParams['font.sans-serif'] = ['SimHei']
         plt.rcParams['axes.unicode_minus'] = False
         self.fig = Figure(dpi=dpi, tight_layout=True)
@@ -758,21 +598,21 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.setupUi(self)
         action_ = self.addToolBar('Action')
         action_.setStyleSheet("background-color: rgb(240, 240, 240);")
-        clear_ = QAction(QIcon("./EasyCID_Icon/clear.png"), 'Clear plot area', self)
+        clear_ = QAction(QIcon("Icon/clear.png"), 'Clear plot area', self)
         clear_.triggered.connect(self.erase_plot_func)
         action_.addAction(clear_)
-        collect_ = QAction(QIcon('./EasyCID_Icon/collect.png'), 'Multiple plot', self)
+        collect_ = QAction(QIcon('Icon/collect.png'), 'Multiple plot', self)
         collect_.triggered.connect(self.mutiplot_func)
         action_.addAction(collect_)
         func_ = self.addToolBar('Function')
-        add_ = QAction(QIcon('./EasyCID_Icon/add.png'), 'Train CNN models', self)
+        add_ = QAction(QIcon('Icon/add.png'), 'Train CNN models', self)
         add_.triggered.connect(self.train_models)
         func_.addAction(add_)
-        run_ = QAction(QIcon('./EasyCID_Icon/predict.png'), 'Prediction', self)
+        run_ = QAction(QIcon('Icon/predict.png'), 'Prediction', self)
         run_.triggered.connect(self.predict_process_func)
         func_.addAction(run_)
-        self.qa = QAction(QIcon('./EasyCID_Icon/analysis.png'), 'Quantitative analysis', self)
-        self.qa.triggered.connect(self.QA_process_func)
+        self.qa = QAction(QIcon('Icon/analysis.png'), 'Quantitative analysis', self)
+        self.qa.triggered.connect(self.ratio_estimation_func)
         func_.addAction(self.qa)
 
         self.fig = Myplot(dpi=100)
@@ -797,7 +637,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.open_act.triggered.connect(self.open_dir_func)
         self.import_act.triggered.connect(self.load_spectra)
         self.save_act.triggered.connect(self.save_function)
-        self.action_link.triggered.connect(self.link_to_db)
+        self.action_link.triggered.connect(self.open_db)
         self.action_setup.triggered.connect(self.set_up_db)
         self.menuHelp.triggered.connect(self.help_html)
 
@@ -846,11 +686,11 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.train_com_name = []
         self.train_com_spec = []
         self.train_para = {}
-        self.ratios = []
+        self.ratios = None
         self.muti = False
         self.pred_on = False
         self.train_on = False
-        self.QA_on = False
+        self.RE_on = False
         self.model_path = ''
         self.data_path = ''
         self.add_spectra_path = ''
@@ -862,8 +702,6 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.link_widget = None
         self.qa.setEnabled(False)
         self.model_ref = {1: 'Yes', 0: 'No'}
-        if os.path.exists('./EasyCID.db'):
-            AppWindow.connect_db(self, './EasyCID.db')
 
         if tf.config.experimental.list_physical_devices('GPU'):
             gpus = tf.config.list_physical_devices(device_type='GPU')
@@ -873,70 +711,51 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
     def help_html(self):
-        path = 'file:///' + os.path.abspath('./documentation/html/index.html')
+        path = 'file:///' + os.path.abspath('helpHTML/index.html')
         webbrowser.open_new_tab(path)
 
     def connect_db(self, path):
-        try:
-            self.db = sqlite3.connect(path)
-            self.db.execute('pragma foreign_keys=on')
-            self.cur = self.db.cursor()
+        # try:
+            self.EasyDB = EasyDB(path)
+            self.db = self.EasyDB.db
+            self.cur = self.EasyDB.cur
             abs_bath = os.path.abspath(path)
             self.modelPath.setTitle('Current Database: "%s"' % abs_bath)
             AppWindow.db_data_display(self)
-        except Exception as err:
-            QMessageBox.information(self, "Error", str(err))
+        # except Exception as err:
+        #     QMessageBox.information(self, "Error", str(err))
 
     def set_up_db(self):
         file_name, _ = QFileDialog.getSaveFileName(self.centralwidget, "Build database", "C:/", 'database (*.db)')
         if not file_name:
             return
         else:
-            db = sqlite3.connect(file_name)
-            cur = db.cursor()
-            sql = 'CREATE TABLE Groups (Group_ID INTEGER PRIMARY KEY, Group_Name VARCHAR)'
-            cur.execute(sql)
-            sql = 'CREATE TABLE Component_Info (Component_ID INTEGER PRIMARY KEY, Component_Name VARCHAR, ' \
-                  'Raw_Spectrum BLOB, Raw_Axis BLOB, Inter_Time FLOAT, Model INTEGER, From_Group INTEGER, ' \
-                  'foreign key(From_Group) references Groups(Group_ID) on delete cascade on update cascade) '
-            cur.execute(sql)
-            sql = 'CREATE TABLE Group_Model_Info (Raman_Start FLOAT, Raman_End FLOAT, Raman_Interval FLOAT, ' \
-                  'Aug_Save_Path VARCHAR, Save_Path VARCHAR, From_Group INTEGER, foreign key(From_Group) references ' \
-                  'Groups(Group_ID) on delete cascade on update cascade) '
-            cur.execute(sql)
-            sql = 'CREATE TABLE Component_Model_Info (Augment_Num INTEGER, Noise_Rate FLOAT, Optimizer INTEGER, ' \
-                  'LR FLOAT, BS INTEGER, EPS INTEGER, From_Component INTEGER, foreign key(From_Component) references ' \
-                  'Component_Info(Component_ID) on delete cascade on update cascade) '
-            cur.execute(sql)
-            db.commit()
+            EasyDB(file_name).set_up_database()
         AppWindow.connect_db(self, file_name)
 
-    def link_to_db(self):
+    def open_db(self):
         file_name, type = QFileDialog.getOpenFileName(self.centralwidget, "Choose database",
                                                       r"C:/", 'database (*.db)')
         if not file_name:
             return
         AppWindow.connect_db(self, file_name)
 
-    def get_db_data(self, cur):
-        sql = "select * from Groups"
-        cur.execute(sql)
-        group_db = cur.fetchall()
+    def get_db_data(self):
+        group_db = self.EasyDB.select('*', 'Groups')
         group_names = [line[1] for line in group_db]
         group_ids = [line[0] for line in group_db]
         if not group_names:
             return None, None
         components_info = []
         for id in group_ids:
-            sql = 'select Component_Name,Model from Component_Info where From_Group=?'
-            component_info = cur.execute(sql, (id,)).fetchall()
+            component_info = self.EasyDB.select('Component_Name,Model', 'Component_Info', 'From_Group=?', (id,))
             components_info.append(component_info)
         return group_names, components_info
 
     def db_data_display(self):
         if not self.db:
             return
-        group_names, components_info = AppWindow.get_db_data(self, self.cur)
+        group_names, components_info = AppWindow.get_db_data(self)
         if group_names is None:
             self.data_display.clear()
             return
@@ -953,28 +772,6 @@ class AppWindow(QMainWindow, Ui_MainWindow):
                 root.addChild(child)
         self.data_display.expandAll()
         self.tabWidget.setCurrentIndex(0)
-
-    def read_simple_txt(self, file_path):
-        x = []
-        y = []
-        try:
-            f = open(file_path, 'rb')
-            r = f.read()
-            charInfo = chardet.detect(r)
-            f = open(file_path, 'r', encoding=(charInfo['encoding']))
-            d = f.readlines()
-
-            for line in d:
-                d1 = line.replace(',', ' ').split()
-                try:
-                    x.append(float(d1[0]))
-                    y.append(float(d1[1]))
-                except:
-                    pass
-            return np.array(x), np.array(y)
-        except Exception as err:
-            QMessageBox.information(self, "Error", str(err))
-            return None, None
 
     def open_dir_func(self):
         self.data_path = QFileDialog.getExistingDirectory(self.centralwidget, "选取文件夹", "C:/")
@@ -1045,8 +842,8 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             if os.path.isfile(newfile):
                 if os.path.splitext(newfile)[1] == ".txt":
                     try:
-                        readfile = parseBWTekFile(newfile, s, select_ramanshift=False, xname='Raman Shift',
-                                                  yname="Dark Subtracted #1")
+                        readfile = parseBWTekFile(newfile, s, select_ramanshift=False,
+                                                  xname='Raman Shift', yname="Dark Subtracted #1")
                         raw_axis = readfile['axis']
                         raw_spectrum = readfile['spectrum']
                         raw_axis, raw_spectrum = zip(*sorted(zip(raw_axis, raw_spectrum)))
@@ -1055,7 +852,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
                         datas.append([None, name, json.dumps(list(raw_spectrum)),
                                       json.dumps(list(raw_axis)), inter_time, 0])
                     except:
-                        raw_axis, raw_spectrum = self.read_simple_txt(newfile)
+                        raw_axis, raw_spectrum = read_simple_txt(newfile)
                         raw_axis, raw_spectrum = zip(*sorted(zip(raw_axis, raw_spectrum)))
                         name = os.path.splitext(s)[0]
                         datas.append([None, name, json.dumps(list(raw_spectrum)), json.dumps(list(raw_axis)), 0.0, 0])
@@ -1104,26 +901,18 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         if not datas:
             QMessageBox.information(self, "Information", 'No available spectral data were found')
             return
-        sql = "select Group_Name from Groups"
-        self.cur.execute(sql)
-        group_db = self.cur.fetchall()
+        group_db = self.EasyDB.select('Group_Name', 'Groups')
         name_list = [line[0] for line in group_db]
         num = 0
         group_name = 'Models' + str(num)
         while group_name in name_list:
             num += 1
             group_name = 'Models' + str(num)
-        sql = 'insert into Groups VALUES (?,?)'
-        self.cur.execute(sql, (None, group_name))
-        self.db.commit()
-        sql = 'select Group_ID from Groups where Group_Name=?'
-        self.cur.execute(sql, (group_name,))
-        group_id = self.cur.fetchone()[0]
+        self.EasyDB.insert('Groups', '(?,?)', (None, group_name))
+        group_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (group_name,))[0][0]
         for i in range(len(datas)):
             datas[i].append(group_id)
-        sql = 'insert into Component_Info VALUES (?,?,?,?,?,?,?)'
-        self.cur.executemany(sql, datas)
-        self.db.commit()
+        self.EasyDB.insert('Component_Info', '(?,?,?,?,?,?,?)', datas, many=True)
         root = QTreeWidgetItem(self.data_display)
         root.setText(0, group_name)
         for column in datas:
@@ -1142,14 +931,10 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         if not datas:
             QMessageBox.information(self, "Information", 'No available spectral data were found')
             return
-        sql = 'select Group_ID from Groups where Group_Name=?'
-        self.cur.execute(sql, (item.text(0),))
-        group_id = self.cur.fetchone()[0]
+        group_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (item.text(0),))[0][0]
         for i in range(len(datas)):
             datas[i].append(group_id)
-        sql = 'insert into Component_Info VALUES (?,?,?,?,?,?,?)'
-        self.cur.executemany(sql, datas)
-        self.db.commit()
+        self.EasyDB.insert('Component_Info', '(?,?,?,?,?,?,?)', datas, many=True)
         for column in datas:
             child = QTreeWidgetItem()
             child.setText(0, column[1])
@@ -1166,12 +951,8 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             reply = QMessageBox.question(self.centralwidget, 'Delete', "Do you want to detele '%s' ?" % name,
                                          QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
             if reply == QMessageBox.Yes:
-                sql = 'select Group_ID from Groups where Group_Name=?'
-                current_id = self.cur.execute(sql, (group_name,)).fetchone()[0]
-                sql = 'delete from Component_Info where Component_Name=? and From_Group=?'
-                self.cur.execute(sql, (name, current_id))
-
-                self.db.commit()
+                current_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (group_name,))[0][0]
+                self.EasyDB.delete('Component_Info', 'Component_Name=? and From_Group=?', (name, current_id))
                 item.parent().removeChild(item)
             else:
                 return
@@ -1187,9 +968,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             reply = QMessageBox.question(self.centralwidget, 'Delete', 'Do you want to detele Table "%s" ?' % group_name
                                          , QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel, QMessageBox.Cancel)
             if reply == QMessageBox.Yes:
-                sql = 'delete from Groups where Group_Name=?'
-                self.cur.execute(sql, (group_name,))
-                self.db.commit()
+                self.EasyDB.delete('Groups', 'Group_Name=?', (group_name,))
                 index = self.data_display.indexOfTopLevelItem(item)
                 self.data_display.takeTopLevelItem(index)
             else:
@@ -1215,21 +994,18 @@ class AppWindow(QMainWindow, Ui_MainWindow):
                 QMessageBox.information(self, "Information", 'Already have Table called "%s"' % m)
                 return
         item.setText(0, m)
-        sql = 'select Group_ID from Groups where Group_Name=?'
-        current_id = self.cur.execute(sql, (name,)).fetchone()[0]
-        sql = 'update Groups set Group_Name=? where Group_ID=?'
-        self.cur.execute(sql, (m, current_id))
-        self.db.commit()
+        current_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (name,))[0][0]
+        self.EasyDB.update('Groups', 'Group_Name=?', 'Group_ID=?', (m, current_id))
 
     def link_Models(self, item):
         self.link_widget = item
         group = item.text(0)
-        sql = 'select Group_ID from Groups where Group_Name=?'
-        group_id = self.cur.execute(sql, (group,)).fetchone()[0]
-        sql = 'select * from Group_Model_Info where From_Group=?'
-        old_para = self.cur.execute(sql, (group_id,)).fetchone()
+        group_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (group,))[0][0]
+        old_para = self.EasyDB.select('*', 'Group_Model_Info', 'From_Group=?', (group_id,))
         if not old_para:
             old_para = [group_id]
+        else:
+            old_para = old_para[0]
         childwin = LinkModels(old_para=old_para)
         childwin.move(self.geometry().x() + (self.geometry().width() - childwin.width()) // 2,
                       self.geometry().y() + (self.geometry().height() - childwin.height()) // 2)
@@ -1240,27 +1016,23 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         QApplication.processEvents()
         group_id = m[0]
         correct_models = m[-1]
-        sql = 'select Component_Name from Component_Info where From_Group=?'
-        names_db = self.cur.execute(sql, (group_id,)).fetchall()
+        names_db = self.EasyDB.select('Component_Name', 'Component_Info', 'From_Group=?', (group_id,))
         names = [n[0] for n in names_db]
-        sql = 'update Component_Info set Model=? where Component_Name=? and From_Group=?'
         for name in names:
             if name in correct_models:
-                self.cur.execute(sql, (1, name, group_id))
+                self.EasyDB.update('Component_Info', 'Model=?', 'Component_Name=? and From_Group=?',
+                                   (1, name, group_id))
                 self.link_widget.child(names.index(name)).setText(1, self.model_ref[1])
             else:
-                self.cur.execute(sql, (0, name, group_id))
+                self.EasyDB.update('Component_Info', 'Model=?', 'Component_Name=? and From_Group=?',
+                                   (0, name, group_id))
                 self.link_widget.child(names.index(name)).setText(1, self.model_ref[0])
-        sql = 'select * from Group_Model_Info where From_Group=?'
-        old_para = self.cur.execute(sql, (group_id,)).fetchone()
+        old_para = self.EasyDB.select('*', 'Group_Model_Info', 'From_Group=?', (group_id,))
         if not old_para:
-            sql = 'insert into Group_Model_Info VALUES (?,?,?,?,?,?)'
-            self.cur.execute(sql, (m[1], m[2], m[3], '', m[4], group_id))
+            self.EasyDB.insert('Group_Model_Info', '(?,?,?,?,?,?)', (m[1], m[2], m[3], '', m[4], group_id))
         else:
-            sql = 'update Group_Model_Info set Raman_Start=?, Raman_End=?, Raman_Interval=?, Save_Path=? where ' \
-                  'From_Group=? '
-            self.cur.execute(sql, (m[1], m[2], m[3], m[4], group_id))
-        self.db.commit()
+            self.EasyDB.update('Group_Model_Info', 'Raman_Start=?, Raman_End=?, Raman_Interval=?, Save_Path=?',
+                               'From_Group=?', (m[1], m[2], m[3], m[4], group_id))
         QMessageBox.information(self, "Information", 'Complete Load Models')
 
     def click_to_plot(self):
@@ -1272,10 +1044,9 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             return
         name = item.text(0)
         group = item.parent().text(0)
-        sql = 'select Group_ID from Groups where Group_Name=?'
-        group_id = self.cur.execute(sql, (group,)).fetchone()[0]
-        sql = 'select Raw_Spectrum,Raw_Axis from Component_Info where Component_Name=? and From_Group=?'
-        datas = self.cur.execute(sql, (name, group_id)).fetchall()[0]
+        group_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (group,))[0][0]
+        datas = self.EasyDB.select('Raw_Spectrum,Raw_Axis', 'Component_Info', 'Component_Name=? and From_Group=?',
+                                   (name, group_id))[0]
         data_array = np.array(json.loads(datas[0]))
         # data_array = data_array / np.max(data_array)
         shift_array = np.array(json.loads(datas[1]))
@@ -1332,10 +1103,8 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         if not item.childCount():
             self.train_group_widget = item.parent()
             self.train_group = item.parent().text(0)
-            sql = 'select Group_ID from Groups where Group_Name=?'
-            group_id = self.cur.execute(sql, (self.train_group,)).fetchone()[0]
-            sql = 'select Component_Name from Component_Info where From_Group=?'
-            names = self.cur.execute(sql, (group_id,)).fetchall()
+            group_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (self.train_group,))[0][0]
+            names = self.EasyDB.select('Component_Name', 'Component_Info', 'From_Group=?', (group_id,))
             for name in names:
                 self.train_com_name.append(name[0])
             if item.text(2) == 'Yes':
@@ -1349,28 +1118,23 @@ class AppWindow(QMainWindow, Ui_MainWindow):
                     return
             else:
                 self.train_index = [self.train_com_name.index(item.text(0))]
-                sql = 'select Component_ID from Component_Info where Component_Name=? and From_Group=?'
-                index = self.cur.execute(sql, (item.text(0), group_id)).fetchone()[0]
+                index = self.EasyDB.select('Component_ID', 'Component_Info', 'Component_Name=? and From_Group=?',
+                                           (item.text(0), group_id))[0][0]
                 try:
-                    sql = 'select * from Component_Model_Info where From_Component=?'
-                    ComponentMI = self.cur.execute(sql, (index,)).fetchone()
+                    ComponentMI = self.EasyDB.select('*', 'Component_Model_Info', 'From_Component=?', (index,))[0]
                 except:
                     ComponentMI = None
-                sql = 'select Component_ID from Component_Info where Model=1 and From_Group=?'
-                jug = self.cur.execute(sql, (group_id,)).fetchall()
+                jug = self.EasyDB.select('Component_ID', 'Component_Info', 'Model=1 and From_Group=?', (group_id,))
                 if len(jug) >= 2:
                     fixed = True
         else:
             self.train_group_widget = item
             self.train_group = item.text(0)
-            sql = 'select Group_ID from Groups where Group_Name=?'
-            group_id = self.cur.execute(sql, (self.train_group,)).fetchone()[0]
-            sql = 'select Component_Name from Component_Info where From_Group=?'
-            names = self.cur.execute(sql, (group_id,)).fetchall()
+            group_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (self.train_group,))[0][0]
+            names = self.EasyDB.select('Component_Name', 'Component_Info', 'From_Group=?', (group_id,))
             for name in names:
                 self.train_com_name.append(name[0])
-            sql = 'select Component_Name from Component_Info where Model=1 and From_Group=?'
-            jug = self.cur.execute(sql, (group_id,)).fetchone()
+            jug = self.EasyDB.select('Component_Name', 'Component_Info', 'Model=1 and From_Group=?', (group_id,))
             if jug:
                 reply = QMessageBox.question(self, 'Train', "Already have some trained models \n "
                                                             "Do you want to re-train them?",
@@ -1378,8 +1142,8 @@ class AppWindow(QMainWindow, Ui_MainWindow):
                 if reply == QMessageBox.Yes:
                     self.train_index = list(np.arange(0, len(self.train_com_name)))
                 elif reply == QMessageBox.No:
-                    sql = 'select Component_Name from Component_Info where Model=0 and From_Group=?'
-                    components = self.cur.execute(sql, (group_id,)).fetchall()
+                    components = self.EasyDB.select('Component_Name', 'Component_Info', 'Model=0 and From_Group=?',
+                                                    (group_id,))
                     if not components:
                         return
                     for com in components:
@@ -1389,19 +1153,17 @@ class AppWindow(QMainWindow, Ui_MainWindow):
                     return
             else:
                 self.train_index = list(np.arange(0, len(self.train_com_name)))
-        sql = 'select Raw_Spectrum, Raw_Axis from Component_Info where From_Group=?'
-        datas = self.cur.execute(sql, (group_id,)).fetchall()
+        datas = self.EasyDB.select('Raw_Spectrum, Raw_Axis', 'Component_Info', 'From_Group=?', (group_id,))
         for data in datas:
             self.train_com_spec.append(np.array(json.loads(data[0])))
             self.t_axis.append(np.array(json.loads(data[1])))
-        sql = 'select * from Group_Model_Info where From_Group=?'
-        old_para = self.cur.execute(sql, (group_id,)).fetchone()
-        if old_para is not None:
-            GroupMI = old_para
+        old_para = self.EasyDB.select('*', 'Group_Model_Info', 'From_Group=?', (group_id,))
+        if old_para:
+            GroupMI = old_para[0]
         self.create_models(GroupMI=GroupMI, ComponentMI=ComponentMI, fixed=fixed)
 
     def create_models(self, GroupMI=None, ComponentMI=None, fixed=False):
-        childwin = TrainNewP(GroupMI=GroupMI, ComponentMI=ComponentMI, fixed=fixed)
+        childwin = TrainingParameterSetting(GroupMI=GroupMI, ComponentMI=ComponentMI, fixed=fixed)
         childwin.move(self.geometry().x() + (self.geometry().width() - childwin.width()) // 2,
                       self.geometry().y() + (self.geometry().height() - childwin.height()) // 2)
         childwin.signal_parp.connect(self.get_train_signal)  # 主窗口接收信号
@@ -1426,7 +1188,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         aug_para = sp[4:7]
         info_para = [self.train_com_name, count, self.train_com_spec, axis, new_axis]
 
-        self.thread = TrainRun(train_para, aug_para, info_para)
+        self.thread = TrainingRun(train_para, aug_para, info_para)
         self.thread.signal.connect(self.get_train_thread_signal)
         self.thread.process_signal.connect(self.get_train_process_signal)
         self.thread.err_signal.connect(self.get_train_err_signal)
@@ -1448,7 +1210,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             self.textBrowser_3.setText('Finished')
             self.train_on = False
             QtCore.QTimer().singleShot(2000, self.clear_text_1)
-            childwin = TrainReport(self.train_para)
+            childwin = TrainingReport(self.train_para)
             childwin.exec_()
         else:
             QMessageBox.information(self, "Information", m)
@@ -1466,35 +1228,26 @@ class AppWindow(QMainWindow, Ui_MainWindow):
     def get_train_data_signal(self, m):
         group = self.train_group
         name = m[0]
-        sql = 'select Group_ID from Groups where Group_Name=?'
-        group_id = self.cur.execute(sql, (group,)).fetchone()[0]
-        sql = 'update Component_Info set Model=? where Component_Name=? and From_Group=?'
-        self.cur.execute(sql, (1, name, group_id))
+        group_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (group,))[0][0]
+        self.EasyDB.update('Component_Info', 'Model=?', 'Component_Name=? and From_Group=?', (1, name, group_id))
         GroupMI = self.GroupMI.copy()
         GroupMI.append(group_id)
-        sql = 'select * from Group_Model_Info where From_Group=?'
-        jug = self.cur.execute(sql, (group_id,)).fetchone()
+        jug = self.EasyDB.select('*', 'Group_Model_Info', 'From_Group=?', (group_id,))
         if jug:
-            sql = 'update Group_Model_Info set Raman_Start=?, Raman_End=?, Raman_Interval=?, Aug_Save_Path=?, ' \
-                  'Save_Path=? where From_Group=? '
-            self.cur.execute(sql, tuple(GroupMI))
+            self.EasyDB.update('Group_Model_Info',
+                               'Raman_Start=?, Raman_End=?, Raman_Interval=?, Aug_Save_Path=?, Save_Path=?',
+                               'From_Group=?', tuple(GroupMI))
         else:
-            sql = 'insert into Group_Model_Info values (?,?,?,?,?,?)'
-            self.cur.execute(sql, GroupMI)
-        sql = 'select Component_ID from Component_Info where Component_Name=?'
-        component_id = self.cur.execute(sql, (name,)).fetchone()[0]
+            self.EasyDB.insert('Group_Model_Info', '(?,?,?,?,?,?)', GroupMI)
+        component_id = self.EasyDB.select('Component_ID ', 'Component_Info', 'Component_Name=?', (name,))[0][0]
         ComponentMI = self.ComponentMI.copy()
         ComponentMI.append(component_id)
-        sql = 'select * from Component_Model_Info where From_Component=?'
-        jug = self.cur.execute(sql, (component_id,)).fetchone()
+        jug = self.EasyDB.select('*', 'Component_Model_Info', 'From_Component=?', (component_id,))
         if jug:
-            sql = 'update Component_Model_Info set Augment_Num=?, Noise_Rate=?, Optimizer=?, LR=?, BS=?, EPS=? where ' \
-                  'From_Component=? '
-            self.cur.execute(sql, tuple(ComponentMI))
+            self.EasyDB.update('Component_Model_Info', 'Augment_Num=?, Noise_Rate=?, Optimizer=?, LR=?, BS=?, EPS=?',
+                               'From_Component=?', tuple(ComponentMI))
         else:
-            sql = 'insert into Component_Model_Info values (?,?,?,?,?,?,?)'
-            self.cur.execute(sql, ComponentMI)
-        self.db.commit()
+            self.EasyDB.insert('Component_Model_Info', '(?,?,?,?,?,?,?)', ComponentMI)
         self.train_group_widget.child(self.train_com_name.index(name)).setText(1, self.model_ref[1])
 
     def get_train_para_signal(self, m):
@@ -1531,9 +1284,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             return
         if not self.db:
             return
-        sql = 'select Group_Name from Groups'
-        self.cur.execute(sql)
-        tab_name_db = self.cur.fetchall()
+        tab_name_db = self.EasyDB.select('Group_Name', 'Groups')
         tab_names = [line[0] for line in tab_name_db]
         childwin = PredictionSetting(tab_names)
         childwin.signal_parp.connect(self.predict_process)
@@ -1544,13 +1295,10 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             return
         self.pred_group = m[0]
         self.threshold = m[1]
-        sql = 'select Group_ID from Groups where Group_Name=?'
-        group_id = self.cur.execute(sql, (self.pred_group,)).fetchone()[0]
-        sql = 'select Component_Name from Component_Info where Model=1 and From_Group=?'
-        component_db = self.cur.execute(sql, (group_id,)).fetchall()
+        group_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (self.pred_group,))[0][0]
+        component_db = self.EasyDB.select('Component_Name', 'Component_Info', 'Model=1 and From_Group=?', (group_id,))
         component_list = [c[0] for c in component_db]
-        sql = 'select * from Group_Model_Info where From_Group=?'
-        group_para = self.cur.execute(sql, (group_id,)).fetchone()
+        group_para = self.EasyDB.select('*', 'Group_Model_Info', 'From_Group=?', (group_id,))[0]
         if not group_para:
             QMessageBox.information(self, "Information", 'No available models')
             return
@@ -1571,7 +1319,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         if self.pred_data is None:
             QMessageBox.information(self, "Information", 'Missing spectra to be analyzed')
             return
-        self.thread_2 = PredRun(self.pred_data, model_path_list)
+        self.thread_2 = PredictionRun(self.pred_data, model_path_list)
         self.thread_2.signal.connect(self.get_pred_thread_signal)
         self.thread_2.data_signal.connect(self.get_pred_data_signal)
         self.thread_2.daemon = True
@@ -1581,7 +1329,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         if m == 'run':
             self.progressBar_2.setMinimum(0)
             self.progressBar_2.setMaximum(0)
-            if self.QA_on:
+            if self.RE_on:
                 self.textBrowser_4.setText('Quantitative analysis')
             else:
                 self.textBrowser_4.setText('Prediction')
@@ -1592,6 +1340,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             self.textBrowser_4.setText('Finished')
             self.pred_on = False
             self.qa.setEnabled(True)
+            self.ratios = None
             QtCore.QTimer().singleShot(2000, self.clear_text_2)
         else:
             QMessageBox.information(self, "Information", m)
@@ -1599,7 +1348,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             self.progressBar_2.setMaximum(100)
             self.textBrowser_4.setText('')
             self.pred_on = False
-            self.QA_on = False
+            self.RE_on = False
 
     def get_pred_data_signal(self, m):
         self.pred_prob = np.asarray(m)
@@ -1623,20 +1372,19 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.predict_result.expandAll()
         self.tabWidget.setCurrentIndex(2)
 
-    def QA_process_func(self):
-        if self.QA_on:
+    def ratio_estimation_func(self):
+        if self.RE_on:
             QMessageBox.information(self, "Information", 'A prediction process is running')
             return
         if not self.db:
             return
-        childwin = RatioEstimation()
-        childwin.signal_parp.connect(self.quantitative_analysis)
+        childwin = RatioEstimationSetting()
+        childwin.signal_parp.connect(self.ratios_estimation)
         childwin.exec_()
 
-    def quantitative_analysis(self, m):
-        self.QA_on = True
-        sql = 'select Group_ID from Groups where Group_Name=?'
-        group_id = self.cur.execute(sql, (self.pred_group,)).fetchone()[0]
+    def ratios_estimation(self, m):
+        self.RE_on = True
+        group_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (self.pred_group,))[0][0]
         i = 0
         mix = []
         com = []
@@ -1645,9 +1393,8 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             Spectrum_data = np.zeros((1, x_size))
             preds = self.result_list[pn]
             for pred in preds:
-                sql = 'select Raw_Axis, Raw_Spectrum, Inter_time from Component_Info where Component_Name=? and ' \
-                      'From_Group=? '
-                spectra_info = self.cur.execute(sql, (pred, group_id)).fetchone()
+                spectra_info = self.EasyDB.select('Raw_Axis, Raw_Spectrum, Inter_time', 'Component_Info',
+                                                  'Component_Name=? and From_Group=?', (pred, group_id))[0]
                 old_axis = np.array(json.loads(spectra_info[0]))
                 old_spectrum = np.array(json.loads(spectra_info[1]))
                 spectrum = np.interp(self.axis, old_axis, old_spectrum).astype(np.float64)
@@ -1665,13 +1412,13 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             mix.append(mixture)
             com.append(spectra_raw)
             i += 1
-        self.thread_3 = QARun(mix, com, m)
+        self.thread_3 = RatioEstimationRun(mix, com, m)
         self.thread_3.signal.connect(self.get_pred_thread_signal)
-        self.thread_3.rate_signal.connect(self.qa_display)
+        self.thread_3.rate_signal.connect(self.ratios_display)
         self.thread_3.daemon = True
         self.thread_3.start()
 
-    def qa_display(self, ratios):
+    def ratios_display(self, ratios):
         self.ratios = ratios
         self.predict_result.clear()
         self.main_root = QTreeWidgetItem(self.predict_result)
@@ -1689,7 +1436,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.predict_result.addTopLevelItem(self.main_root)
         self.predict_result.expandAll()
         self.tabWidget.setCurrentIndex(2)
-        self.QA_on = False
+        self.RE_on = False
 
     def clear_text_1(self):
         self.textBrowser_3.setText('')
@@ -1718,16 +1465,15 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.fig.axes.set_xlabel("Raman Shift", fontsize=12, color='k')
         self.fig.axes.set_ylabel("Intensity", fontsize=12, color='k')
         if pred:
-            sql = 'select Group_ID from Groups where Group_Name=?'
-            group_id = self.cur.execute(sql, (self.pred_group,)).fetchone()[0]
+            group_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (self.pred_group,))[0][0]
             pred_idx = self.pred_names.index(pred)
             mix_data = self.pred_data[pred_idx]
             self.fig.axes.plot(self.axis, mix_data, label=pred)
             if component_list:
                 for m in range(len(component_list)):
-                    sql = 'select Raw_Axis, Raw_Spectrum, Inter_time from Component_Info where Component_Name=? and ' \
-                          'From_Group=? '
-                    spectra_info = self.cur.execute(sql, (component_list[m], group_id)).fetchone()
+                    spectra_info = self.EasyDB.select('Raw_Axis, Raw_Spectrum, Inter_time', 'Component_Info',
+                                                      'Component_Name=? and From_Group=?',
+                                                      (component_list[m], group_id))[0]
                     old_axis = np.array(json.loads(spectra_info[0]))
                     old_spectrum = np.array(json.loads(spectra_info[1]))
                     spectrum = np.interp(self.axis, old_axis, old_spectrum).astype(np.float64)

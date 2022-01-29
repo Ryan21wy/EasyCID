@@ -197,18 +197,18 @@ class Ui_MainWindow(object):
         MainWindow.addToolBar(QtCore.Qt.TopToolBarArea, self.toolBar)
         self.save_act = QtWidgets.QAction(MainWindow)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap("./EasyCID_Icon/save.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(QtGui.QPixmap("../Icon/save.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.save_act.setIcon(icon)
         self.save_act.setObjectName("save_act")
         self.action_link = QtWidgets.QAction(MainWindow)
         self.action_link.setObjectName("action_link")
         icon2 = QtGui.QIcon()
-        icon2.addPixmap(QtGui.QPixmap("./EasyCID_Icon/link.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon2.addPixmap(QtGui.QPixmap("../Icon/link.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.action_link.setIcon(icon2)
         self.action_setup = QtWidgets.QAction(MainWindow)
         self.action_setup.setObjectName("action_setup")
         icon3 = QtGui.QIcon()
-        icon3.addPixmap(QtGui.QPixmap("./EasyCID_Icon/SetUp.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon3.addPixmap(QtGui.QPixmap("../Icon/SetUp.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.action_setup.setIcon(icon3)
         self.import_act = QtWidgets.QAction(MainWindow)
         self.import_act.setObjectName("import_act")
@@ -240,15 +240,15 @@ class Ui_MainWindow(object):
         self.data_plot.setTitle(_translate("MainWindow", "RESULT_PLOT_AREA"))
         self.component_plot.setTitle(_translate("MainWindow", "COMPONENT_PLOT_AREA"))
         self.textBrowser_3.setHtml(_translate("MainWindow", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
-"<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
+"<helpHTML><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
 "p, li { white-space: pre-wrap; }\n"
 "</style></head><body style=\" font-family:\'SimSun\'; font-size:9pt; font-weight:400; font-style:normal;\">\n"
-"<p align=\"center\" style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>"))
+"<p align=\"center\" style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></helpHTML>"))
         self.textBrowser_4.setHtml(_translate("MainWindow", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
-"<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
+"<helpHTML><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
 "p, li { white-space: pre-wrap; }\n"
 "</style></head><body style=\" font-family:\'SimSun\'; font-size:9pt; font-weight:400; font-style:normal;\">\n"
-"<p align=\"center\" style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>"))
+"<p align=\"center\" style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></helpHTML>"))
         self.wjgl.setTitle(_translate("MainWindow", "File"))
         self.modelPath.setTitle(_translate("MainWindow", "current model path："))
         self.menuDatabase.setTitle(_translate("MainWindow", "Database"))

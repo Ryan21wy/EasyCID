@@ -1,0 +1,65 @@
+.. _Basic Concepts:
+
+Basic Concepts
+==============
+
+Database
+--------
+
+The Raman spectra are stored in the SQLite database for better scaling, productivity and easy maintenance. The schema of the SQLite database is shown as follows:
+
+.. image:: ./images/schema.png                                   
+    :width: 300px
+
+EasyCID can extract the spectral information from raw Raman spectra in SPC, JCAMP-DX and TXT formats. Then, the extracted information, such intensity and Raman shift, is inserted into the database. These information can be retrieved from the database for data augmentation, training and prediction.
+
+Data Augmentation
+-----------------
+
+Data augmentation can generate enough data to train the deep neural network and improve the generalization ability of the models. For each spectrum of compound in database, simulated spectra are obtained by mixing pure spectra in pairs and adding random gaussian noise, where half of the simulated spectra contained this compound called positive spectra, while the other half do not contain called negative ones. For the positive spectra, the spectra of the other interference compounds were randomly combined with the original spectra, and the ratios of the original spectrum was not less than 10 percent. The noise level is equal to the maximum value of simulated spectrum times the noise rate. Finally, the simulated spectra were randomly divided into three parts in the 8:1:1 ratio, which are used for training, validation, and testing set respectively.
+
+CNN models
+----------
+
+CNN can extract the features of the spectra and learn to identify components of unknown spectra of mixtures. 
+
+.. image:: ./images/CNN.png                                   
+    :width: 600px
+
+one-dimensional CNN with six hidden layers is used. The convolution layers are used to extract the features of spectra, which consists of a one-dimensional convolution, batch normalization and rectify linear unit (ReLU) function. Each convolution layer is followed by a pooling layer, which eliminates noisy information and reduce the amount of data. The fully connected layer are used as a classifier to determine the existence of the component based on the extracted features, where ReLU is used as the activation function in first layer while Sigmoid is used in second layer. Between two fully connected layers, Dropout is used to increase the generalization ability of the model. Binary cross entropy is used as the loss function.
+
+.. _Hyperparameters of CNN models:
+
+Hyperparameters of CNN models
+-----------------------------
+
+From all the adjustable hyperparameters for training CNN models, we selected the most important ones for the training step to reduce the learning cost for non-machine-learning experts. 
+
+	* EasyCID offers four adaptive optimizers, and the default **Adam** optimizer typically requiring no tuning or little fine-tuning to accommodate a wide range of deep learning tasks.
+
+	* **Learning rate** is the most important hyperparameter for training CNN model. Its value can be adjusted by combining the training report given on **Training Report Window** and referring to the following figure:
+
+.. image:: ./images/lr.png                              
+    :width: 400px
+
+It is recommended to set the initial learning rate from 0.0001 to 0.001.
+
+	* **Batch size** affects the optimization degree and speed of the algorithm, and it depends on the size of the GPU/CPU memory. 
+
+	* It's better to set the **epochs** larger since the early stopping strategy was applied in training process. When the performance of the model does not improve within a certain period, this strategy will terminate the training process and save parameters with optimal performance of all time.
+
+
+Baseline Subtracted
+-------------------
+
+Adaptive iteratively reweighted penalized least squares (airPLS) is used as the baseline subtracted method that works by iteratively changing weights of sum squares errors between the fitted baseline and original signals.
+
+Spectral Smoothing
+------------------
+
+Whittaker smoother is a spectral smoothing method that based on penalized least squares, which obtains smoothed data by adjusting the weight between the fidelity and roughness of data.
+
+Regression Analysis
+-------------------
+
+Elastic net is used to determine the proportion of each pure component in the mixture. The method can be treated as a hybrid of lasso and ridge regression, which combines both the L1 and L2 regularization to improve the regularization of statistical models. The details for elastic net used in EasyCID can be seen at `sklearn.linear_model.ElasticNet  <https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.ElasticNet.html>`_ 
