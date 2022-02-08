@@ -32,6 +32,7 @@ from PyQt5.QtCore import QThread, QStringListModel, pyqtSignal
 from PyQt5.QtGui import QIcon, QStandardItemModel, QStandardItem
 from matplotlib.figure import Figure
 from sklearn.linear_model import enet_path
+from datetime import datetime
 # local packages
 from EasyCID.readFile.spc.spcio import readSPC
 from EasyCID.readFile import jcamp
@@ -49,6 +50,10 @@ from EasyCID.Windows import TableName_win, PredictionParameter_win, LinkModels_w
     RatioEstimation_win, TrainingParameter_win
 
 
+path_config = {'Setup': '', 'OpenDB': '', 'OpenFiles': '', 'Import': '',
+               'SaveResult': '', 'Models': '', 'Augment': '', 'LinkModels': ''}
+
+
 class TrainingParameterSetting(QDialog):
     signal_parp = pyqtSignal(list)
 
@@ -58,7 +63,7 @@ class TrainingParameterSetting(QDialog):
         self.child.setupUi(self)
         self.child.dir_choose.setIcon(QIcon('Icon/view.png'))
         self.child.aug_choose.setIcon(QIcon('Icon/view.png'))
-        self.child.dir_choose.clicked.connect(self.dir_chose)
+        self.child.dir_choose.clicked.connect(self.model_path_chose)
         self.child.aug_choose.clicked.connect(self.aug_chose)
         self.child.save_.clicked.connect(self.signal_emit)
         self.child.cancel_.clicked.connect(self.cancel)
@@ -96,20 +101,28 @@ class TrainingParameterSetting(QDialog):
             min_ = 1.00
         return min_, int_
 
-    def dir_chose(self):
-        last = self.child.savepath.text()
-        if last:
-            save_path = QFileDialog.getExistingDirectory(win.centralwidget, "choose save path", last)
+    def model_path_chose(self):
+        global path_config
+        last_path = path_config['Models']
+        if last_path:
+            save_path = QFileDialog.getExistingDirectory(win.centralwidget, "models save path", last_path)
         else:
-            save_path = QFileDialog.getExistingDirectory(win.centralwidget, "choose save path", "C:/")
+            save_path = QFileDialog.getExistingDirectory(win.centralwidget, "models save path", "C:/")
+        if not save_path:
+            return
+        path_config['Models'] = os.path.dirname(save_path)
         self.child.savepath.setText(save_path)
 
     def aug_chose(self):
-        last = self.child.aug_savepath.text()
-        if last:
-            save_path = QFileDialog.getExistingDirectory(win.centralwidget, "choose save path", last)
+        global path_config
+        last_path = path_config['Augment']
+        if last_path:
+            save_path = QFileDialog.getExistingDirectory(win.centralwidget, "augmentation path", last_path)
         else:
-            save_path = QFileDialog.getExistingDirectory(win.centralwidget, "choose save path", "C:/")
+            save_path = QFileDialog.getExistingDirectory(win.centralwidget, "augmentation path", "C:/")
+        if not save_path:
+            return
+        path_config['Augment'] = os.path.dirname(save_path)
         self.child.aug_savepath.setText(save_path)
 
     def signal_emit(self):
@@ -245,11 +258,15 @@ class LinkModels(QDialog):
         self.child.cancel_.clicked.connect(self.cancel)
 
     def dir_chose(self):
-        last = self.child.modelpath.text()
-        if last:
-            model_path = QFileDialog.getExistingDirectory(win.centralwidget, "choose model path", last)
+        global path_config
+        last_path = path_config['LinkModels']
+        if last_path:
+            model_path = QFileDialog.getExistingDirectory(win.centralwidget, "choose model path", last_path)
         else:
             model_path = QFileDialog.getExistingDirectory(win.centralwidget, "choose model path", "C:/")
+        if not model_path:
+            return
+        path_config['LinkModels'] = os.path.dirname(model_path)
         self.child.modelpath.setText(model_path)
         info_path = os.path.join(model_path, 'ModelsInfo.json')
         if os.path.exists(info_path):
@@ -399,6 +416,9 @@ class PredictionSetting(QDialog):
 
 class TrainingRun(QThread):
     process_signal = pyqtSignal(str)
+    max_bar = pyqtSignal(int)
+    current_bar = pyqtSignal(int)
+    bar_text = pyqtSignal(str)
     signal = pyqtSignal(str)
     err_signal = pyqtSignal(str)
     data_signal = pyqtSignal(list)
@@ -431,11 +451,15 @@ class TrainingRun(QThread):
                 spectrum = spectrum / np.max(spectrum)
                 Spectrumdata = np.vstack((Spectrumdata, spectrum.T))
             spectra_raw = np.delete(Spectrumdata, 0, 0)
-            a = 1
+            current_com = 0
+            total_com = len(self.count)
+            self.process_signal.emit('Training Active')
+            self.current_bar.emit(current_com)
+            self.bar_text.emit('%s/%s' % (current_com, total_com))
+            self.max_bar.emit(total_com)
+            t0 = datetime.now()
             for com in self.count:
-                print(self.count)
                 para_record = []
-                self.process_signal.emit('Augmentation Active (%s/%s) :' % (str(a), str(len(self.count))))
                 if self.aug_save_path:
                     mkdir(self.aug_save_path)
                     aug_data_path = os.path.join(self.aug_save_path, self.names[com] + '.npy')
@@ -450,7 +474,6 @@ class TrainingRun(QThread):
                 else:
                     spectrum, label = data_augment(spectra_raw, com, num=self.aug_number, nr=self.noise_rate)
                 Xtrain, Xtest, Ytrain, Ytest = spilt_dataset(spectrum, label)
-                self.process_signal.emit('Training Active (%s/%s) :' % (str(a), str(len(self.count))))
                 tf.keras.backend.clear_session()
                 ops.reset_default_graph()
 
@@ -480,13 +503,22 @@ class TrainingRun(QThread):
                 del model
                 self.data_signal.emit(new_spectra[com])
                 self.para_signal.emit(para_record)
-                a += 1
+                current_com += 1
+                t1 = datetime.now()
+                cost_t = str(t1 - t0).split('.')[0]
+                average_t = str(((t1 - t0) / current_com).seconds)
+                remain_t = str((t1 - t0) / current_com * (total_com - current_com)).split('.')[0]
+                self.current_bar.emit(current_com)
+                self.bar_text.emit('%s/%s' % (current_com, total_com))
+                self.process_signal.emit('Training Active [%s<%s] %ss/it' % (cost_t, remain_t, average_t))
             self.signal.emit('finished')
         except Exception as err:
             self.err_signal.emit(str(err))
 
 
 class PredictionRun(QThread):
+    max_bar = pyqtSignal(int)
+    current_bar = pyqtSignal(int)
     signal = pyqtSignal(str)
     data_signal = pyqtSignal(list)
 
@@ -506,6 +538,10 @@ class PredictionRun(QThread):
                                  loss='binary_crossentropy',
                                  metrics=['accuracy'])
             y_DeepCID = []
+            current_model = 0
+            total_model = len(self.model_path)
+            self.current_bar.emit(current_model)
+            self.max_bar.emit(total_model)
             for path in self.model_path:
                 tf.keras.backend.clear_session()
                 ops.reset_default_graph()
@@ -513,6 +549,8 @@ class PredictionRun(QThread):
                 Xtest_pre = Xtest_pre.reshape(Xtest_pre.shape[0], Xtest_pre.shape[1], 1)
                 y = reload_model.predict(Xtest_pre)
                 y_DeepCID.append(y)
+                current_model += 1
+                self.current_bar.emit(current_model)
             self.data_signal.emit(y_DeepCID)
             self.signal.emit('finished')
         except Exception as err:
@@ -709,35 +747,57 @@ class AppWindow(QMainWindow, Ui_MainWindow):
                 tf.config.experimental.set_memory_growth(device=gpu, enable=True)
         else:
             os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+        self.get_config()
+
+    def get_config(self):
+        global path_config
+        info_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'PathConfig.json')
+        if os.path.exists(info_path):
+            with open(info_path, 'r') as fp:
+                path_config = json.load(fp)
 
     def help_html(self):
         path = 'file:///' + os.path.abspath('helpHTML/index.html')
         webbrowser.open_new_tab(path)
 
     def connect_db(self, path):
-        # try:
+        try:
             self.EasyDB = EasyDB(path)
             self.db = self.EasyDB.db
             self.cur = self.EasyDB.cur
             abs_bath = os.path.abspath(path)
             self.modelPath.setTitle('Current Database: "%s"' % abs_bath)
             AppWindow.db_data_display(self)
-        # except Exception as err:
-        #     QMessageBox.information(self, "Error", str(err))
+        except Exception as err:
+            QMessageBox.information(self, "Error", str(err))
 
     def set_up_db(self):
-        file_name, _ = QFileDialog.getSaveFileName(self.centralwidget, "Build database", "C:/", 'database (*.db)')
+        global path_config
+        last_path = path_config['Setup']
+        if last_path:
+            file_name, _ = QFileDialog.getSaveFileName(self.centralwidget, "Build database", last_path,
+                                                       'database (*.db)')
+        else:
+            file_name, _ = QFileDialog.getSaveFileName(self.centralwidget, "Build database", "C:/",
+                                                       'database (*.db)')
         if not file_name:
             return
-        else:
-            EasyDB(file_name).set_up_database()
+        path_config['Setup'] = os.path.dirname(file_name)
+        EasyDB(file_name).set_up_database()
         AppWindow.connect_db(self, file_name)
 
     def open_db(self):
-        file_name, type = QFileDialog.getOpenFileName(self.centralwidget, "Choose database",
-                                                      r"C:/", 'database (*.db)')
+        global path_config
+        last_path = path_config['OpenDB']
+        if last_path:
+            file_name, type = QFileDialog.getOpenFileName(self.centralwidget, "Choose database",
+                                                          last_path, 'database (*.db)')
+        else:
+            file_name, type = QFileDialog.getOpenFileName(self.centralwidget, "Choose database",
+                                                          r"C:/", 'database (*.db)')
         if not file_name:
             return
+        path_config['OpenDB'] = os.path.dirname(file_name)
         AppWindow.connect_db(self, file_name)
 
     def get_db_data(self):
@@ -774,9 +834,15 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.tabWidget.setCurrentIndex(0)
 
     def open_dir_func(self):
-        self.data_path = QFileDialog.getExistingDirectory(self.centralwidget, "选取文件夹", "C:/")
+        global path_config
+        last_path = path_config['OpenFiles']
+        if last_path:
+            self.data_path = QFileDialog.getExistingDirectory(self.centralwidget, "选取文件夹", last_path)
+        else:
+            self.data_path = QFileDialog.getExistingDirectory(self.centralwidget, "选取文件夹", "C:/")
         if not self.data_path:
             return
+        path_config['OpenFiles'] = os.path.dirname(self.data_path)
         self.mix_list = []
         self.mix_data['x'] = []
         self.mix_data['y'] = []
@@ -892,11 +958,17 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         return datas
 
     def load_spectra(self):
+        global path_config
         if not self.db:
             return
-        spectra_path = QFileDialog.getExistingDirectory(self.centralwidget, "Choose data path", "C:/")
+        last_path = path_config['Import']
+        if last_path:
+            spectra_path = QFileDialog.getExistingDirectory(self.centralwidget, "Choose data path", last_path)
+        else:
+            spectra_path = QFileDialog.getExistingDirectory(self.centralwidget, "Choose data path", "C:/")
         if not spectra_path:
             return
+        path_config['Import'] = os.path.dirname(spectra_path)
         datas = AppWindow.read_spectra(self, spectra_path)
         if not datas:
             QMessageBox.information(self, "Information", 'No available spectral data were found')
@@ -922,11 +994,17 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             root.addChild(child)
 
     def add_spectra(self, item):
+        global path_config
         if not item.childCount():
             return
-        spectra_path = QFileDialog.getExistingDirectory(self.centralwidget, "选取文件夹", "C:/")
+        last_path = path_config['Import']
+        if last_path:
+            spectra_path = QFileDialog.getExistingDirectory(self.centralwidget, "选取文件夹", last_path)
+        else:
+            spectra_path = QFileDialog.getExistingDirectory(self.centralwidget, "选取文件夹", "C:/")
         if not spectra_path:
             return
+        path_config['Import'] = os.path.dirname(spectra_path)
         datas = AppWindow.read_spectra(self, spectra_path)
         if not datas:
             QMessageBox.information(self, "Information", 'No available spectral data were found')
@@ -979,7 +1057,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
     def change_group_name(self, item):
         name = item.text(0)
         childwin = ChangeName(name)
-        childwin.signal_parp.connect(self.change_name_signal)  # 主窗口接收信号
+        childwin.signal_parp.connect(self.change_name_signal)
         childwin.exec_()
 
     def change_name_signal(self, m):
@@ -1048,7 +1126,6 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         datas = self.EasyDB.select('Raw_Spectrum,Raw_Axis', 'Component_Info', 'Component_Name=? and From_Group=?',
                                    (name, group_id))[0]
         data_array = np.array(json.loads(datas[0]))
-        # data_array = data_array / np.max(data_array)
         shift_array = np.array(json.loads(datas[1]))
         if not self.muti:
             self.fig_2.axes.cla()
@@ -1166,7 +1243,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         childwin = TrainingParameterSetting(GroupMI=GroupMI, ComponentMI=ComponentMI, fixed=fixed)
         childwin.move(self.geometry().x() + (self.geometry().width() - childwin.width()) // 2,
                       self.geometry().y() + (self.geometry().height() - childwin.height()) // 2)
-        childwin.signal_parp.connect(self.get_train_signal)  # 主窗口接收信号
+        childwin.signal_parp.connect(self.get_train_signal)
         childwin.exec_()
 
     def get_train_signal(self, m):
@@ -1191,6 +1268,9 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.thread = TrainingRun(train_para, aug_para, info_para)
         self.thread.signal.connect(self.get_train_thread_signal)
         self.thread.process_signal.connect(self.get_train_process_signal)
+        self.thread.max_bar.connect(self.get_max_bar_value)
+        self.thread.current_bar.connect(self.get_current_bar_value)
+        self.thread.bar_text.connect(self.get_bar_text)
         self.thread.err_signal.connect(self.get_train_err_signal)
         self.thread.data_signal.connect(self.get_train_data_signal)
         self.thread.para_signal.connect(self.get_train_para_signal)
@@ -1199,14 +1279,15 @@ class AppWindow(QMainWindow, Ui_MainWindow):
 
     def get_train_thread_signal(self, m):
         if m == 'run':
-            self.progressBar.setMinimum(0)
-            self.progressBar.setMaximum(0)
-            self.textBrowser_3.setText('Training CNN models')
+            # self.progressBar.setMinimum(0)
+            # self.progressBar.setMaximum(0)
+            # self.textBrowser_3.setText('Training CNN models')
+            self.progressBar.setTextVisible(True)
             self.train_on = True
             self.train_para = {}
         elif m == 'finished':
-            self.progressBar.setMinimum(0)
-            self.progressBar.setMaximum(100)
+            self.progressBar.setValue(0)
+            self.progressBar.setTextVisible(False)
             self.textBrowser_3.setText('Finished')
             self.train_on = False
             QtCore.QTimer().singleShot(2000, self.clear_text_1)
@@ -1214,6 +1295,15 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             childwin.exec_()
         else:
             QMessageBox.information(self, "Information", m)
+
+    def get_max_bar_value(self, m):
+        self.progressBar.setMaximum(m)
+
+    def get_current_bar_value(self, m):
+        self.progressBar.setValue(m)
+
+    def get_bar_text(self, m):
+        self.progressBar.setFormat(m + ' %p%')
 
     def get_train_process_signal(self, m):
         self.textBrowser_3.setText(m)
@@ -1321,22 +1411,29 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             return
         self.thread_2 = PredictionRun(self.pred_data, model_path_list)
         self.thread_2.signal.connect(self.get_pred_thread_signal)
+        self.thread_2.current_bar.connect(self.get_current_bar_value2)
+        self.thread_2.max_bar.connect(self.get_max_bar_value2)
         self.thread_2.data_signal.connect(self.get_pred_data_signal)
         self.thread_2.daemon = True
         self.thread_2.start()
 
+    def get_max_bar_value2(self, m):
+        self.progressBar_2.setMaximum(m)
+
+    def get_current_bar_value2(self, m):
+        self.progressBar_2.setValue(m)
+
     def get_pred_thread_signal(self, m):
         if m == 'run':
-            self.progressBar_2.setMinimum(0)
-            self.progressBar_2.setMaximum(0)
             if self.RE_on:
                 self.textBrowser_4.setText('Quantitative analysis')
             else:
+                self.progressBar_2.setTextVisible(True)
                 self.textBrowser_4.setText('Prediction')
             self.pred_on = True
         elif m == 'finished':
-            self.progressBar_2.setMinimum(0)
-            self.progressBar_2.setMaximum(100)
+            self.progressBar_2.setValue(0)
+            self.progressBar_2.setTextVisible(False)
             self.textBrowser_4.setText('Finished')
             self.pred_on = False
             self.qa.setEnabled(True)
@@ -1344,8 +1441,8 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             QtCore.QTimer().singleShot(2000, self.clear_text_2)
         else:
             QMessageBox.information(self, "Information", m)
-            self.progressBar_2.setMinimum(0)
-            self.progressBar_2.setMaximum(100)
+            self.progressBar_2.setValue(0)
+            self.progressBar_2.setTextVisible(False)
             self.textBrowser_4.setText('')
             self.pred_on = False
             self.RE_on = False
@@ -1484,12 +1581,19 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.fig.draw()
 
     def save_function(self):
+        global path_config
         if not self.result_list:
             return
-        save_path, ext = QFileDialog.getSaveFileName(self.centralwidget, "Choose result save path", "C:/",
-                                                     "EXCEL(*.xlsx)")
+        last_path = path_config['SaveResult']
+        if last_path:
+            save_path, ext = QFileDialog.getSaveFileName(self.centralwidget, "Choose result save path", last_path,
+                                                         "EXCEL(*.xlsx)")
+        else:
+            save_path, ext = QFileDialog.getSaveFileName(self.centralwidget, "Choose result save path", "C:/",
+                                                         "EXCEL(*.xlsx)")
         if not save_path:
             return
+        path_config['SaveResult'] = os.path.dirname(save_path)
         self.thread_s = EXCELCreate(self.pred_names, self.result_list, self.ratios, save_path)
         self.thread_s.signal.connect(self.get_save_thread_signal)
         self.thread_s.daemon = True
@@ -1518,6 +1622,10 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         Qno = messageBox.addButton(self.tr("Cancel"), QMessageBox.NoRole)
         messageBox.exec_()
         if messageBox.clickedButton() == Qyes:
+            global path_config
+            info_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'PathConfig.json')
+            with open(info_path, 'w') as fp:
+                json.dump(path_config, fp)
             event.accept()
         elif messageBox.clickedButton() == Qno:
             event.ignore()
