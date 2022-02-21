@@ -24,12 +24,11 @@ import matplotlib.pyplot as plt
 from tensorflow.python.framework import ops
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
-from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtCore import Qt
+# from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtWidgets import QApplication, QMainWindow, QGridLayout, QAbstractItemView, \
-    QFileDialog, QDialog, QMessageBox, QTreeWidgetItem, QAction, QMenu, QHeaderView
-from PyQt5.QtCore import QThread, QStringListModel, pyqtSignal
-from PyQt5.QtGui import QIcon, QStandardItemModel, QStandardItem
+    QFileDialog, QDialog, QMessageBox, QTreeWidgetItem, QMenu, QHeaderView, QSizePolicy
+from PyQt5.QtCore import Qt, QThread, QStringListModel, pyqtSignal, QTimer
+from PyQt5.QtGui import QIcon, QStandardItemModel, QStandardItem, QFont
 from matplotlib.figure import Figure
 from sklearn.linear_model import enet_path
 from datetime import datetime
@@ -44,14 +43,14 @@ from EasyCID.Prediction.AirPLS import airPLS, WhittakerSmooth
 from EasyCID.Utils.makeDir import mkdir
 from EasyCID.Utils.makeEXCEL import make_excel
 from EasyCID.Utils.database import EasyCIDDatabase as EasyDB
+from EasyCID.Utils.downloadDemo import demo
 # windows of EasyCID
-from EasyCID.Windows.MainWindow import Ui_MainWindow
-from EasyCID.Windows import TableName_win, PredictionParameter_win, LinkModels_win, TrainingReport_win, \
+from EasyCID.Windows.MainWindow2 import Ui_MainWindow
+from EasyCID.Windows import TableName_win, PredictionParameter_win, TrainingReport_win, \
     RatioEstimation_win, TrainingParameter_win
 
 
-path_config = {'Setup': '', 'OpenDB': '', 'OpenFiles': '', 'Import': '',
-               'SaveResult': '', 'Models': '', 'Augment': '', 'LinkModels': ''}
+path_config = {'OpenDB': '', 'OpenFiles': '', 'Import': '', 'Models': '', 'Augment': ''}
 
 
 class TrainingParameterSetting(QDialog):
@@ -238,94 +237,6 @@ class ChangeName(QDialog):
 
     def value_reset(self):
         self.child.name.setText(self.init_name)
-
-
-class LinkModels(QDialog):
-    signal_parp = pyqtSignal(list)
-
-    def __init__(self, old_para=None):
-        QDialog.__init__(self)
-        self.child = LinkModels_win.Ui_Dialog()
-        self.child.setupUi(self)
-        if len(old_para) > 1:
-            self.child.startshift.setValue(old_para[0])
-            self.child.endshift.setValue(old_para[1])
-            self.child.interval.setValue(old_para[2])
-        self.child.dir_choose.setIcon(QIcon('Icon/view.png'))
-        self.child.dir_choose.clicked.connect(self.dir_chose)
-        self.group = old_para[-1]
-        self.child.link_.clicked.connect(self.link)
-        self.child.cancel_.clicked.connect(self.cancel)
-
-    def dir_chose(self):
-        global path_config
-        last_path = path_config['LinkModels']
-        if last_path:
-            model_path = QFileDialog.getExistingDirectory(win.centralwidget, "choose model path", last_path)
-        else:
-            model_path = QFileDialog.getExistingDirectory(win.centralwidget, "choose model path", "C:/")
-        if not model_path:
-            return
-        path_config['LinkModels'] = os.path.dirname(model_path)
-        self.child.modelpath.setText(model_path)
-        info_path = os.path.join(model_path, 'ModelsInfo.json')
-        if os.path.exists(info_path):
-            try:
-                with open(info_path, 'r') as fp:
-                    info = json.load(fp)
-                self.child.startshift.setValue(info['start'])
-                self.child.endshift.setValue(info['end'])
-                self.child.interval.setValue(info['interval'])
-            except:
-                return
-        else:
-            return
-
-    def link(self):
-        signal = []
-        model_path = self.child.modelpath.text()
-        if not model_path:
-            return
-        start_shift = self.child.startshift.value()
-        end_shift = self.child.endshift.value()
-        interval = self.child.interval.value()
-        if end_shift <= start_shift:
-            QMessageBox.warning(self, "error", 'The end of Raman shift cannot be smaller than the start')
-            return
-        elif (end_shift - start_shift) < interval:
-            QMessageBox.warning(self, "error", 'The interval is too big')
-            return
-        correct_models = []
-        x_test = np.arange(start_shift, end_shift, interval).reshape(1, -1)
-        reload_model = cnn_model(x_test)
-        tf.keras.backend.clear_session()
-        ops.reset_default_graph()
-        dir = os.listdir(model_path)
-        for file in dir:
-            path = os.path.join(model_path, file)
-            if os.path.isfile(path) and file.split('.')[-1] == 'h5':
-                try:
-                    reload_model.load_weights(path)
-                    x_test = x_test.reshape(x_test.shape[0], x_test.shape[1], 1)
-                    reload_model.predict(x_test)
-                except Exception as err:
-                    QMessageBox.warning(self, "error", str(err))
-                    return
-                correct_models.append(file.split('.')[0])
-        if not correct_models:
-            QMessageBox.warning(self, "error", 'No available models were found')
-            return
-        signal.append(self.group)
-        signal.append(start_shift)
-        signal.append(end_shift)
-        signal.append(interval)
-        signal.append(model_path)
-        signal.append(correct_models)
-        self.signal_parp.emit(signal)
-        LinkModels.close(self)
-
-    def cancel(self):
-        LinkModels.close(self)
 
 
 class RatioEstimationSetting(QDialog):
@@ -558,6 +469,8 @@ class PredictionRun(QThread):
 
 
 class RatioEstimationRun(QThread):
+    max_bar = pyqtSignal(int)
+    current_bar = pyqtSignal(int)
     signal = pyqtSignal(str)
     rate_signal = pyqtSignal(list)
 
@@ -575,6 +488,8 @@ class RatioEstimationRun(QThread):
             en_param = self.parameters['en']
             ratios = []
             k = 0
+            self.max_bar.emit(len(self.mix))
+            self.current_bar.emit(k)
             for m in self.mix:
                 com_spectra = self.com[k]
                 if sm_param is not None:
@@ -593,6 +508,7 @@ class RatioEstimationRun(QThread):
                 ratio = np.round(ratio, 3)
                 ratios.append(ratio)
                 k += 1
+                self.current_bar.emit(k)
             self.rate_signal.emit(ratios)
             self.signal.emit('finished')
         except Exception as err:
@@ -618,15 +534,30 @@ class EXCELCreate(QThread):
             self.signal.emit(str(err))
 
 
+class DownloadDemo(QThread):
+    signal = pyqtSignal(str)
+
+    def __init__(self):
+        super().__init__()
+
+    def run(self):
+        try:
+            self.signal.emit('run')
+            demo()
+            self.signal.emit('finish')
+        except Exception as err:
+            self.signal.emit(str(err))
+
+
 class Myplot(FigureCanvas):
     def __init__(self, dpi=100):
-        plt.rc('font', family='Times New Roman')
+        plt.rc('font', family='Arial')
         plt.rcParams['font.sans-serif'] = ['SimHei']
         plt.rcParams['axes.unicode_minus'] = False
         self.fig = Figure(dpi=dpi, tight_layout=True)
         FigureCanvas.__init__(self, self.fig)
         self.axes = self.fig.add_subplot(111)
-        FigureCanvas.setSizePolicy(self, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        FigureCanvas.setSizePolicy(self, QSizePolicy.Expanding, QSizePolicy.Expanding)
         FigureCanvas.updateGeometry(self)
 
 
@@ -634,60 +565,77 @@ class AppWindow(QMainWindow, Ui_MainWindow):
     def __init__(self, parent=None):
         super(AppWindow, self).__init__(parent)
         self.setupUi(self)
-        action_ = self.addToolBar('Action')
-        action_.setStyleSheet("background-color: rgb(240, 240, 240);")
-        clear_ = QAction(QIcon("Icon/clear.png"), 'Clear plot area', self)
-        clear_.triggered.connect(self.erase_plot_func)
-        action_.addAction(clear_)
-        collect_ = QAction(QIcon('Icon/collect.png'), 'Multiple plot', self)
-        collect_.triggered.connect(self.mutiplot_func)
-        action_.addAction(collect_)
-        func_ = self.addToolBar('Function')
-        add_ = QAction(QIcon('Icon/add.png'), 'Train CNN models', self)
-        add_.triggered.connect(self.train_models)
-        func_.addAction(add_)
-        run_ = QAction(QIcon('Icon/predict.png'), 'Prediction', self)
-        run_.triggered.connect(self.predict_process_func)
-        func_.addAction(run_)
-        self.qa = QAction(QIcon('Icon/analysis.png'), 'Quantitative analysis', self)
-        self.qa.triggered.connect(self.ratio_estimation_func)
-        func_.addAction(self.qa)
+        self.open_database.setIcon(QIcon("Icon/opendb.png"))
+        self.open_database.clicked.connect(self.open_db)
+        self.build_database.setIcon(QIcon("Icon/builddb.png"))
+        self.build_database.clicked.connect(self.set_up_db)
+
+        self.add_group.setIcon(QIcon("Icon/addGroup.png"))
+        self.add_group.clicked.connect(self.load_spectra)
+        self.delete_group.clicked.connect(self.group_delete)
+        self.delete_group.setIcon(QIcon("Icon/deleteGroup.png"))
+
+        self.add_spectra.setIcon(QIcon("Icon/addSpectra.png"))
+        self.add_spectra.clicked.connect(self.add_spectra_to_group)
+        self.delete_spectra.clicked.connect(self.spectra_delete)
+        self.delete_spectra.setIcon(QIcon("Icon/deleteSpectra.png"))
+
+        self.add_group.setEnabled(False)
+        self.delete_group.setEnabled(False)
+        self.add_spectra.setEnabled(False)
+        self.delete_spectra.setEnabled(False)
+
+        self.clear_plot_area.setIcon(QIcon("Icon/clear.png"))
+        self.clear_plot_area.clicked.connect(self.erase_plot_func)
+        self.collect_spectra.setIcon(QIcon("Icon/collect.png"))
+        self.collect_spectra.clicked.connect(self.mutiplot_func)
+
+        self.train_run.setIcon(QIcon("Icon/addModel.png"))
+        self.train_run.clicked.connect(self.train_models)
+        self.train_run.setEnabled(False)
+
+        self.open_mix.setIcon(QIcon("Icon/open.png"))
+        self.open_mix.clicked.connect(self.open_dir)
+        self.pred_run.setIcon(QIcon("Icon/predict.png"))
+        self.pred_run.clicked.connect(self.predict_process_func)
+        self.ratio_estimation.setIcon(QIcon("Icon/analysis.png"))
+        self.ratio_estimation.clicked.connect(self.ratio_estimation_func)
+        self.save_results.setIcon(QIcon("Icon/save.png"))
+        self.save_results.clicked.connect(self.save_function)
+        self.pred_run.setEnabled(False)
+        self.ratio_estimation.setEnabled(False)
+        self.save_results.setEnabled(False)
+
+        self.show_help_html.setIcon(QIcon("Icon/help.png"))
+        self.show_help_html.clicked.connect(self.help_html)
+        self.show_demo.setIcon(QIcon("Icon/demo.png"))
+        self.show_demo.clicked.connect(self.download_demo)
+
+        self.data_.clicked.connect(lambda: self.ChangeToolBar(0))
+        self.function_.clicked.connect(lambda: self.ChangeToolBar(1))
+        self.help_.clicked.connect(lambda: self.ChangeToolBar(2))
 
         self.fig = Myplot(dpi=100)
         self.fig.axes.set_xlabel("Raman Shift", fontsize=12, color='k')
         self.fig.axes.set_ylabel("Intensity", fontsize=12, color='k')
         self.fig_ntb = NavigationToolbar(self.fig, self)
-        self.gridlayout_1 = QGridLayout(self.data_plot)
+        self.gridlayout_1 = QGridLayout(self.frame)
         self.gridlayout_1.addWidget(self.fig)
         self.gridlayout_1.addWidget(self.fig_ntb)
-        self.fig_2 = Myplot(dpi=100)
-        self.fig_2.axes.set_xlabel("Raman Shift", fontsize=12, color='k')
-        self.fig_2.axes.set_ylabel("Intensity", fontsize=12, color='k')
-        self.fig_ntb_2 = NavigationToolbar(self.fig_2, self.component_plot)
-        self.gridlayout_1 = QGridLayout(self.component_plot)
-        self.gridlayout_1.addWidget(self.fig_2)
-        self.gridlayout_1.addWidget(self.fig_ntb_2)
 
         self.data_list.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.data_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.data_list.doubleClicked.connect(self.click_to_plot_mix)
 
-        self.open_act.triggered.connect(self.open_dir_func)
-        self.import_act.triggered.connect(self.load_spectra)
-        self.save_act.triggered.connect(self.save_function)
-        self.action_link.triggered.connect(self.open_db)
-        self.action_setup.triggered.connect(self.set_up_db)
-        self.menuHelp.triggered.connect(self.help_html)
-
         self.data_display.doubleClicked.connect(self.click_to_plot)
-        self.data_display.setContextMenuPolicy(Qt.CustomContextMenu)
+        # self.data_display.setContextMenuPolicy(Qt.CustomContextMenu)
         self.data_display.setColumnCount(2)
-        self.data_display.setHeaderLabels(['Component', ' Trained '])
+        self.data_display.setHeaderLabels([' Component ', ' Trained '])
         self.data_display.header().setStretchLastSection(False)
         self.data_display.header().setSectionResizeMode(QHeaderView.Stretch)
         self.data_display.header().setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        self.data_display.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.data_display.customContextMenuRequested.connect(self.data_display_menu)
+        # self.data_display.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        # self.data_display.customContextMenuRequested.connect(self.data_display_menu)
 
         self.predict_result.itemChanged.connect(self.get_checked)
         self.predict_result.setColumnCount(2)
@@ -696,7 +644,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.predict_result.header().setSectionResizeMode(QHeaderView.Stretch)
         self.predict_result.header().setSectionResizeMode(1, QHeaderView.ResizeToContents)
 
-        self.modelPath.setTitle('')
+        self.database_path.setText('')
         self.progressBar.setValue(0)
         self.progressBar.setTextVisible(False)
         self.progressBar_2.setValue(0)
@@ -738,7 +686,6 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.GroupMI = None
         self.ComponentMI = None
         self.link_widget = None
-        self.qa.setEnabled(False)
         self.model_ref = {1: 'Yes', 0: 'No'}
 
         if tf.config.experimental.list_physical_devices('GPU'):
@@ -748,6 +695,19 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         else:
             os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
         self.get_config()
+        self.ChangeToolBar(0)
+
+    def ChangeToolBar(self, i):
+        menu = {0: self.data_, 1: self.function_, 2: self.help_}
+        for a in range(3):
+            if a == i:
+                menu[a].setStyleSheet("background-color: rgb(240, 240, 240);"
+                                      "color: rgb(50, 100, 170);")
+            else:
+                menu[a].setStyleSheet("background-color: rgb(50, 100, 170);"
+                                      "color: rgb(255, 255, 255);"
+                                      "QPushButton:hover{background-color:rgb(30, 75, 125)}")
+        self.stackedWidget.setCurrentIndex(i)
 
     def get_config(self):
         global path_config
@@ -766,14 +726,15 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             self.db = self.EasyDB.db
             self.cur = self.EasyDB.cur
             abs_bath = os.path.abspath(path)
-            self.modelPath.setTitle('Current Database: "%s"' % abs_bath)
+            self.database_path.setText('  Current Database: "%s"' % abs_bath)
             AppWindow.db_data_display(self)
+            self.add_group.setEnabled(True)
         except Exception as err:
             QMessageBox.information(self, "Error", str(err))
 
     def set_up_db(self):
         global path_config
-        last_path = path_config['Setup']
+        last_path = path_config['OpenDB']
         if last_path:
             file_name, _ = QFileDialog.getSaveFileName(self.centralwidget, "Build database", last_path,
                                                        'database (*.db)')
@@ -782,7 +743,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
                                                        'database (*.db)')
         if not file_name:
             return
-        path_config['Setup'] = os.path.dirname(file_name)
+        path_config['OpenDB'] = os.path.dirname(file_name)
         EasyDB(file_name).set_up_database()
         AppWindow.connect_db(self, file_name)
 
@@ -830,10 +791,14 @@ class AppWindow(QMainWindow, Ui_MainWindow):
                 child.setText(0, column[0])
                 child.setText(1, self.model_ref[column[1]])
                 root.addChild(child)
-        self.data_display.expandAll()
+        # self.data_display.expandAll()
         self.tabWidget.setCurrentIndex(0)
+        self.delete_group.setEnabled(True)
+        self.add_spectra.setEnabled(True)
+        self.delete_spectra.setEnabled(True)
+        self.train_run.setEnabled(True)
 
-    def open_dir_func(self):
+    def open_dir(self):
         global path_config
         last_path = path_config['OpenFiles']
         if last_path:
@@ -843,11 +808,15 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         if not self.data_path:
             return
         path_config['OpenFiles'] = os.path.dirname(self.data_path)
+        self.open_dir_func(self.data_path)
+        self.tabWidget.setCurrentIndex(1)
+
+    def open_dir_func(self, data_path):
         self.mix_list = []
         self.mix_data['x'] = []
         self.mix_data['y'] = []
         self.mix_data['it'] = []
-        datas = self.read_spectra(self.data_path)
+        datas = self.read_spectra(data_path)
         for data in datas:
             self.mix_data['x'].append(np.array(json.loads(data[3])))
             self.mix_data['y'].append(np.array(json.loads(data[2])))
@@ -858,47 +827,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         data_list_model = QStringListModel()
         data_list_model.setStringList(self.mix_list)
         self.data_list.setModel(data_list_model)
-        self.tabWidget.setCurrentIndex(1)
-
-    def data_display_menu(self, pos):
-        menu = QMenu()
-        delete_group = menu.addAction("Delete Group")
-        change_group_name = menu.addAction("Change Group Name")
-        link_Models = menu.addAction("Link Models")
-        menu.addSeparator()
-        add_spectra = menu.addAction("Add Spectra")
-        delete_spectra = menu.addAction("Delete Spectra")
-        item = self.data_display.currentItem()
-        if not item:
-            delete_group.setEnabled(False)
-            change_group_name.setEnabled(False)
-            link_Models.setEnabled(False)
-            add_spectra.setEnabled(False)
-            delete_spectra.setEnabled(False)
-        else:
-            if item.childCount():
-                delete_group.setEnabled(True)
-                change_group_name.setEnabled(True)
-                link_Models.setEnabled(True)
-                add_spectra.setEnabled(True)
-                delete_spectra.setEnabled(False)
-            else:
-                delete_group.setEnabled(False)
-                change_group_name.setEnabled(False)
-                link_Models.setEnabled(False)
-                add_spectra.setEnabled(False)
-                delete_spectra.setEnabled(True)
-        action = menu.exec_(self.data_display.mapToGlobal(pos))
-        if action == delete_group:
-            AppWindow.delete_group(self)
-        elif action == change_group_name:
-            AppWindow.change_group_name(self, item)
-        elif action == link_Models:
-            AppWindow.link_Models(self, item)
-        elif action == add_spectra:
-            AppWindow.add_spectra(self, item)
-        elif action == delete_spectra:
-            AppWindow.delete_spectra(self)
+        self.pred_run.setEnabled(True)
 
     def read_spectra(self, spectra_path):
         datas = []
@@ -992,9 +921,17 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             child.setText(0, column[1])
             child.setText(1, self.model_ref[column[5]])
             root.addChild(child)
+        if not self.delete_group.isEnabled():
+            self.delete_group.setEnabled(True)
+            self.add_spectra.setEnabled(True)
+            self.delete_spectra.setEnabled(True)
+            self.train_run.setEnabled(True)
 
-    def add_spectra(self, item):
+    def add_spectra_to_group(self):
         global path_config
+        item = self.data_display.currentItem()
+        if not item:
+            return
         if not item.childCount():
             return
         last_path = path_config['Import']
@@ -1019,7 +956,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             child.setText(1, self.model_ref[column[5]])
             item.addChild(child)
 
-    def delete_spectra(self):
+    def spectra_delete(self):
         item = self.data_display.currentItem()
         if not item:
             return
@@ -1037,7 +974,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         else:
             return
 
-    def delete_group(self):
+    def group_delete(self):
         item = self.data_display.currentItem()
         if not item:
             return
@@ -1075,50 +1012,13 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         current_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (name,))[0][0]
         self.EasyDB.update('Groups', 'Group_Name=?', 'Group_ID=?', (m, current_id))
 
-    def link_Models(self, item):
-        self.link_widget = item
-        group = item.text(0)
-        group_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (group,))[0][0]
-        old_para = self.EasyDB.select('*', 'Group_Model_Info', 'From_Group=?', (group_id,))
-        if not old_para:
-            old_para = [group_id]
-        else:
-            old_para = old_para[0]
-        childwin = LinkModels(old_para=old_para)
-        childwin.move(self.geometry().x() + (self.geometry().width() - childwin.width()) // 2,
-                      self.geometry().y() + (self.geometry().height() - childwin.height()) // 2)
-        childwin.signal_parp.connect(self.get_link_signal)
-        childwin.exec_()
-
-    def get_link_signal(self, m):
-        QApplication.processEvents()
-        group_id = m[0]
-        correct_models = m[-1]
-        names_db = self.EasyDB.select('Component_Name', 'Component_Info', 'From_Group=?', (group_id,))
-        names = [n[0] for n in names_db]
-        for name in names:
-            if name in correct_models:
-                self.EasyDB.update('Component_Info', 'Model=?', 'Component_Name=? and From_Group=?',
-                                   (1, name, group_id))
-                self.link_widget.child(names.index(name)).setText(1, self.model_ref[1])
-            else:
-                self.EasyDB.update('Component_Info', 'Model=?', 'Component_Name=? and From_Group=?',
-                                   (0, name, group_id))
-                self.link_widget.child(names.index(name)).setText(1, self.model_ref[0])
-        old_para = self.EasyDB.select('*', 'Group_Model_Info', 'From_Group=?', (group_id,))
-        if not old_para:
-            self.EasyDB.insert('Group_Model_Info', '(?,?,?,?,?,?)', (m[1], m[2], m[3], '', m[4], group_id))
-        else:
-            self.EasyDB.update('Group_Model_Info', 'Raman_Start=?, Raman_End=?, Raman_Interval=?, Save_Path=?',
-                               'From_Group=?', (m[1], m[2], m[3], m[4], group_id))
-        QMessageBox.information(self, "Information", 'Complete Load Models')
-
     def click_to_plot(self):
-        if self.plot_lock:
-            QMessageBox.information(self, "Information", 'Please wait until result save process finished')
-            return
         item = self.data_display.currentItem()
         if item.childCount():
+            self.change_group_name(item)
+            return
+        if self.plot_lock:
+            QMessageBox.information(self, "Information", 'Please wait until result save process finished')
             return
         name = item.text(0)
         group = item.parent().text(0)
@@ -1128,12 +1028,12 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         data_array = np.array(json.loads(datas[0]))
         shift_array = np.array(json.loads(datas[1]))
         if not self.muti:
-            self.fig_2.axes.cla()
-        self.fig_2.axes.plot(shift_array, data_array, label=name)
-        self.fig_2.axes.set_xlabel("Raman Shift", fontsize=12, color='k')
-        self.fig_2.axes.set_ylabel("intensity", fontsize=12, color='k')
-        self.fig_2.axes.legend(loc='best')
-        self.fig_2.draw()
+            self.fig.axes.cla()
+        self.fig.axes.plot(shift_array, data_array, label=name)
+        self.fig.axes.set_xlabel("Raman Shift", fontsize=12, color='k')
+        self.fig.axes.set_ylabel("intensity", fontsize=12, color='k')
+        self.fig.axes.legend(loc='best')
+        self.fig.draw()
 
     def click_to_plot_mix(self):
         if self.plot_lock:
@@ -1144,24 +1044,29 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         data_array = self.mix_data['y'][idx]
         shift_array = self.mix_data['x'][idx]
         if not self.muti:
-            self.fig_2.axes.cla()
-        self.fig_2.axes.plot(shift_array, data_array, label=name)
-        self.fig_2.axes.set_xlabel("Raman Shift", fontsize=12, color='k')
-        self.fig_2.axes.set_ylabel("intensity", fontsize=12, color='k')
-        self.fig_2.axes.legend(loc='best')
-        self.fig_2.draw()
+            self.fig.axes.cla()
+        self.fig.axes.plot(shift_array, data_array, label=name)
+        self.fig.axes.set_xlabel("Raman Shift", fontsize=12, color='k')
+        self.fig.axes.set_ylabel("intensity", fontsize=12, color='k')
+        self.fig.axes.legend(loc='best')
+        self.fig.draw()
 
     def mutiplot_func(self):
         if self.muti:
             self.muti = False
+            self.collect_spectra.setStyleSheet("QToolButton{background-color:rgb(240, 240, 240);"
+                                               "border:0px;}"
+                                               "QToolButton:hover{background-color:rgb(220, 220, 220)}")
         else:
             self.muti = True
+            self.collect_spectra.setStyleSheet("QToolButton{background-color:rgb(220, 220, 220);"
+                                               "border:0px;}")
 
     def erase_plot_func(self):
-        self.fig_2.axes.cla()
-        self.fig_2.axes.set_xlabel("Raman Shift", fontsize=12, color='k')
-        self.fig_2.axes.set_ylabel("intensity", fontsize=12, color='k')
-        self.fig_2.draw()
+        self.fig.axes.cla()
+        self.fig.axes.set_xlabel("Raman Shift", fontsize=12, color='k')
+        self.fig.axes.set_ylabel("intensity", fontsize=12, color='k')
+        self.fig.draw()
 
     def train_models(self):
         if self.train_on:
@@ -1213,7 +1118,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
                 self.train_com_name.append(name[0])
             jug = self.EasyDB.select('Component_Name', 'Component_Info', 'Model=1 and From_Group=?', (group_id,))
             if jug:
-                reply = QMessageBox.question(self, 'Train', "Already have some trained models \n "
+                reply = QMessageBox.question(self, 'Train', "Already have some models \n "
                                                             "Do you want to re-train them?",
                                              QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel, QMessageBox.Cancel)
                 if reply == QMessageBox.Yes:
@@ -1255,9 +1160,9 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         info_path = os.path.join(self.model_path, 'ModelsInfo.json')
         with open(info_path, 'w') as fp:
             json.dump(model_info, fp)
-        AppWindow.train_run(self, m[3:], self.train_index, self.t_axis, self.t_new_axis)
+        AppWindow.training_strat(self, m[3:], self.train_index, self.t_axis, self.t_new_axis)
 
-    def train_run(self, sp, count, axis, new_axis):
+    def training_strat(self, sp, count, axis, new_axis):
         optimizer_list = [tf.keras.optimizers.Adam(lr=sp[1]), tf.keras.optimizers.Adadelta(lr=sp[1]),
                           tf.keras.optimizers.Adagrad(lr=sp[1]), tf.keras.optimizers.Adamax(lr=sp[1])]
         optimizer = optimizer_list[sp[0]]
@@ -1279,9 +1184,6 @@ class AppWindow(QMainWindow, Ui_MainWindow):
 
     def get_train_thread_signal(self, m):
         if m == 'run':
-            # self.progressBar.setMinimum(0)
-            # self.progressBar.setMaximum(0)
-            # self.textBrowser_3.setText('Training CNN models')
             self.progressBar.setTextVisible(True)
             self.train_on = True
             self.train_para = {}
@@ -1290,7 +1192,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             self.progressBar.setTextVisible(False)
             self.textBrowser_3.setText('Finished')
             self.train_on = False
-            QtCore.QTimer().singleShot(2000, self.clear_text_1)
+            QTimer().singleShot(2000, self.clear_text_1)
             childwin = TrainingReport(self.train_para)
             childwin.exec_()
         else:
@@ -1395,12 +1297,14 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.axis = np.arange(group_para[0], group_para[1], group_para[2])
         self.candidate_model = []
         model_path_list = []
-        dir = os.listdir(group_para[-2])
+        models_path = os.path.abspath(group_para[-2])
+        print(models_path)
+        dir = os.listdir(models_path)
         for file in dir:
             if os.path.isfile(os.path.join(group_para[-2], file)):
                 [name, type] = file.split('.')
                 if (name in component_list) and (type == 'h5'):
-                    model_path_list.append(os.path.join(group_para[-2], file))
+                    model_path_list.append(os.path.join(models_path, file))
                     self.candidate_model.append(name)
         if not model_path_list:
             QMessageBox.information(self, "Information", 'No available models')
@@ -1426,7 +1330,8 @@ class AppWindow(QMainWindow, Ui_MainWindow):
     def get_pred_thread_signal(self, m):
         if m == 'run':
             if self.RE_on:
-                self.textBrowser_4.setText('Quantitative analysis')
+                self.progressBar_2.setTextVisible(True)
+                self.textBrowser_4.setText('Ratios estimation')
             else:
                 self.progressBar_2.setTextVisible(True)
                 self.textBrowser_4.setText('Prediction')
@@ -1436,9 +1341,10 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             self.progressBar_2.setTextVisible(False)
             self.textBrowser_4.setText('Finished')
             self.pred_on = False
-            self.qa.setEnabled(True)
             self.ratios = None
-            QtCore.QTimer().singleShot(2000, self.clear_text_2)
+            self.ratio_estimation.setEnabled(True)
+            self.save_results.setEnabled(True)
+            QTimer().singleShot(2000, self.clear_text_2)
         else:
             QMessageBox.information(self, "Information", m)
             self.progressBar_2.setValue(0)
@@ -1476,10 +1382,10 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         if not self.db:
             return
         childwin = RatioEstimationSetting()
-        childwin.signal_parp.connect(self.ratios_estimation)
+        childwin.signal_parp.connect(self.ratios_estimate)
         childwin.exec_()
 
-    def ratios_estimation(self, m):
+    def ratios_estimate(self, m):
         self.RE_on = True
         group_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (self.pred_group,))[0][0]
         i = 0
@@ -1512,6 +1418,8 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.thread_3 = RatioEstimationRun(mix, com, m)
         self.thread_3.signal.connect(self.get_pred_thread_signal)
         self.thread_3.rate_signal.connect(self.ratios_display)
+        self.thread_3.current_bar.connect(self.get_current_bar_value2)
+        self.thread_3.max_bar.connect(self.get_max_bar_value2)
         self.thread_3.daemon = True
         self.thread_3.start()
 
@@ -1584,7 +1492,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         global path_config
         if not self.result_list:
             return
-        last_path = path_config['SaveResult']
+        last_path = path_config['OpenFiles']
         if last_path:
             save_path, ext = QFileDialog.getSaveFileName(self.centralwidget, "Choose result save path", last_path,
                                                          "EXCEL(*.xlsx)")
@@ -1593,7 +1501,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
                                                          "EXCEL(*.xlsx)")
         if not save_path:
             return
-        path_config['SaveResult'] = os.path.dirname(save_path)
+        path_config['OpenFiles'] = os.path.dirname(save_path)
         self.thread_s = EXCELCreate(self.pred_names, self.result_list, self.ratios, save_path)
         self.thread_s.signal.connect(self.get_save_thread_signal)
         self.thread_s.daemon = True
@@ -1609,12 +1517,46 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             self.progressBar_2.setMaximum(100)
             self.textBrowser_4.setText('Finished')
             self.plot_lock = False
-            QtCore.QTimer().singleShot(2000, self.clear_text_2)
+            QTimer().singleShot(2000, self.clear_text_2)
         else:
             QMessageBox.information(self, "Information", m)
             self.progressBar_2.setMaximum(100)
             self.textBrowser_4.setText('')
             self.plot_lock = False
+
+    def download_demo(self):
+        if self.train_on:
+            QMessageBox.information(self, "Information", 'Training process in progress')
+            return
+        reply = QMessageBox.question(self, 'download demo', 'It will takes a few minutes to download a demo of '
+                                                            'EasyCID. Do you want to continue?',
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+        if reply == QMessageBox.No:
+            return
+        elif reply == QMessageBox.Yes:
+            self.thread = DownloadDemo()
+            self.thread.signal.connect(self.get_demo_thread_signal)
+            self.thread.daemon = True
+            self.thread.start()
+        return
+
+    def get_demo_thread_signal(self, m):
+        if m == 'run':
+            self.textBrowser_3.setText('Download the demo of EasyCID')
+            self.progressBar.setMaximum(0)
+        elif m == 'finish':
+            db_path = os.path.dirname(__file__) + "//demo//EasyCID_demo.db"
+            AppWindow.connect_db(self, db_path)
+            models_path = os.path.dirname(__file__) + "//demo//models"
+            self.EasyDB.update('Group_Model_Info', 'Save_Path=?', 'From_Group=?', (models_path, 1))
+            mixtures_path = os.path.dirname(__file__) + "//demo//mixtures"
+            self.open_dir_func(mixtures_path)
+            self.progressBar.setMaximum(10)
+            self.textBrowser_3.setText('Finished')
+            QTimer().singleShot(2000, self.clear_text_1)
+        else:
+            self.progressBar.setMaximum(10)
+            QMessageBox.information(self, "Information", m)
 
     def closeEvent(self, event):
         messageBox = QMessageBox(QMessageBox.Question, "Confirm Exit", "Are you sure you want to exit EasyCID?")
@@ -1633,6 +1575,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    app.setFont(QFont('Arial', 10))
     win = AppWindow()
     win.show()
     sys.exit(app.exec_())
