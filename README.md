@@ -39,4 +39,4 @@ The html ducomentation and a demo are provided in the GUI of EasyCID.
 ## Contact
 
 Wang Yue   
-E-mail: Ryanwy@csu.edu.cn 
+E-mail: ryanwy@csu.edu.cn 
