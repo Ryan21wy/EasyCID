@@ -19,7 +19,7 @@ Install Package: [EasyCID-1.0-Windows.exe]()
 
 5. Clone the repository and enter:  
 
-        git clone 
+        git clone https://github.com/Ryan21wy/EasyCID.git
         cd EasyCID
 
 6. Install dependency with the following commands:  
