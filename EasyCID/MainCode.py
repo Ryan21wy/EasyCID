@@ -41,13 +41,13 @@ from EasyCID.Training.data_augmentation import data_augment
 from EasyCID.Training.spilt_dataset import spilt_dataset
 from EasyCID.Prediction.AirPLS import airPLS, WhittakerSmooth
 from EasyCID.Utils.makeDir import mkdir
-from EasyCID.Utils.makeEXCEL import make_excel
+from EasyCID.Utils.makeCSV import make_csv
 from EasyCID.Utils.database import EasyCIDDatabase as EasyDB
-from EasyCID.Utils.downloadDemo import demo
+from EasyCID.Utils.downloadDemo import get_url_info, nameTrans, download
 # windows of EasyCID
-from EasyCID.Windows.MainWindow2 import Ui_MainWindow
+from EasyCID.Windows.MainWindow import Ui_MainWindow
 from EasyCID.Windows import TableName_win, PredictionParameter_win, TrainingReport_win, \
-    RatioEstimation_win, TrainingParameter_win
+    RatioEstimation_win, TrainingParameter_win, LinkModels_win
 
 
 path_config = {'OpenDB': '', 'OpenFiles': '', 'Import': '', 'Models': '', 'Augment': ''}
@@ -237,6 +237,94 @@ class ChangeName(QDialog):
 
     def value_reset(self):
         self.child.name.setText(self.init_name)
+
+
+class LoadModels(QDialog):
+    signal_parp = pyqtSignal(list)
+
+    def __init__(self, old_para=None):
+        QDialog.__init__(self)
+        self.child = LinkModels_win.Ui_Dialog()
+        self.child.setupUi(self)
+        if len(old_para) > 1:
+            self.child.startshift.setValue(old_para[0])
+            self.child.endshift.setValue(old_para[1])
+            self.child.interval.setValue(old_para[2])
+        self.child.dir_choose.setIcon(QIcon('Icon/view.png'))
+        self.child.dir_choose.clicked.connect(self.dir_chose)
+        self.group = old_para[-1]
+        self.child.link_.clicked.connect(self.link)
+        self.child.cancel_.clicked.connect(self.cancel)
+
+    def dir_chose(self):
+        global path_config
+        last_path = path_config['Models']
+        if last_path:
+            model_path = QFileDialog.getExistingDirectory(win.centralwidget, "choose model path", last_path)
+        else:
+            model_path = QFileDialog.getExistingDirectory(win.centralwidget, "choose model path", "C:/")
+        if not model_path:
+            return
+        path_config['Models'] = os.path.dirname(model_path)
+        self.child.modelpath.setText(model_path)
+        info_path = os.path.join(model_path, 'ModelsInfo.json')
+        if os.path.exists(info_path):
+            try:
+                with open(info_path, 'r') as fp:
+                    info = json.load(fp)
+                self.child.startshift.setValue(info['start'])
+                self.child.endshift.setValue(info['end'])
+                self.child.interval.setValue(info['interval'])
+            except:
+                return
+        else:
+            return
+
+    def link(self):
+        signal = []
+        model_path = self.child.modelpath.text()
+        if not model_path:
+            return
+        start_shift = self.child.startshift.value()
+        end_shift = self.child.endshift.value()
+        interval = self.child.interval.value()
+        if end_shift <= start_shift:
+            QMessageBox.warning(self, "error", 'The end of Raman shift cannot be smaller than the start')
+            return
+        elif (end_shift - start_shift) < interval:
+            QMessageBox.warning(self, "error", 'The interval is too big')
+            return
+        correct_models = []
+        x_test = np.arange(start_shift, end_shift, interval).reshape(1, -1)
+        reload_model = cnn_model(x_test)
+        tf.keras.backend.clear_session()
+        ops.reset_default_graph()
+        dir = os.listdir(model_path)
+        for file in dir:
+            path = os.path.join(model_path, file)
+            if os.path.isfile(path) and file.split('.')[-1] == 'h5':
+                try:
+                    reload_model.load_weights(path)
+                    x_test = x_test.reshape(x_test.shape[0], x_test.shape[1], 1)
+                    reload_model.predict(x_test)
+                except Exception as err:
+                    QMessageBox.warning(self, "error", str(err))
+                    return
+                correct_models.append(file.split('.')[0])
+        if not correct_models:
+            QMessageBox.warning(self, "error", 'No available models were found')
+            return
+        signal.append(self.group)
+        signal.append(start_shift)
+        signal.append(end_shift)
+        signal.append(interval)
+        signal.append(model_path)
+        signal.append(correct_models)
+        self.signal_parp.emit(signal)
+        LoadModels.close(self)
+
+    def cancel(self):
+        LoadModels.close(self)
 
 
 class RatioEstimationSetting(QDialog):
@@ -515,7 +603,7 @@ class RatioEstimationRun(QThread):
             self.signal.emit(str(err))
 
 
-class EXCELCreate(QThread):
+class CSVCreate(QThread):
     signal = pyqtSignal(str)
 
     def __init__(self, pred_names, pred_list, c_list, save_path):
@@ -528,7 +616,7 @@ class EXCELCreate(QThread):
     def run(self):
         try:
             self.signal.emit('run')
-            make_excel(self.pred_names, self.pred_list, self.save_path, ratios=self.c_list)
+            make_csv(self.pred_names, self.pred_list, self.save_path, ratios=self.c_list)
             self.signal.emit('finish')
         except Exception as err:
             self.signal.emit(str(err))
@@ -536,14 +624,73 @@ class EXCELCreate(QThread):
 
 class DownloadDemo(QThread):
     signal = pyqtSignal(str)
+    max_bar = pyqtSignal(int)
+    current_bar = pyqtSignal(int)
 
     def __init__(self):
         super().__init__()
+        self.p_url = "https://raw.githubusercontent.com/Ryan21wy/EasyCID/master/Samples"
+        self.info = get_url_info()
 
     def run(self):
         try:
             self.signal.emit('run')
-            demo()
+            p_url = self.p_url
+            components = self.info[0]
+            mixtures = self.info[1]
+            model_info = self.info[2]
+            db = self.info[3]
+            total_url_number = 2 * len(components) + len(mixtures) + len(db) + len(model_info)
+            self.max_bar.emit(total_url_number)
+            count = 0
+            self.current_bar.emit(count)
+            t_dir = os.path.dirname(os.path.abspath(__file__))
+            print(t_dir)
+            # t_dir = os.path.dirname(abs_dir)
+            components_path = os.path.join(t_dir, 'demo', 'components')
+            mkdir(components_path)
+            for com in components:
+                component_file_name = com + '.txt'
+                component_url = p_url + '/components/' + nameTrans(component_file_name)
+                component_path = os.path.join(components_path, component_file_name)
+                download(component_url, component_path)
+                count += 1
+                self.current_bar.emit(count)
+
+            mixtures_path = os.path.join(t_dir, 'demo', 'mixtures')
+            mkdir(mixtures_path)
+            for mix in mixtures:
+                mixture_file_name = mix + '.txt'
+                mixture_url = p_url + '/mixtures/' + nameTrans(mixture_file_name)
+                mixture_path = os.path.join(mixtures_path, mixture_file_name)
+                download(mixture_url, mixture_path)
+                count += 1
+                self.current_bar.emit(count)
+
+            models_path = os.path.join(t_dir, 'demo', 'models')
+            mkdir(models_path)
+            for com in components:
+                model_file_name = com + '.h5'
+                model_url = p_url + '/models/' + nameTrans(model_file_name)
+                model_path = os.path.join(models_path, model_file_name)
+                download(model_url, model_path)
+                count += 1
+                self.current_bar.emit(count)
+            model_info_name = model_info[0]
+            model_info_url = p_url + '/models/' + nameTrans(model_info_name)
+            model_info_path = os.path.join(models_path, model_info_name)
+            download(model_info_url, model_info_path)
+            count += 1
+            self.current_bar.emit(count)
+
+            db_path = os.path.join(t_dir, 'demo')
+            for d in db:
+                db_file_name = d + '.db'
+                db_url = p_url + '/' + nameTrans(db_file_name)
+                d_path = os.path.join(db_path, db_file_name)
+                download(db_url, d_path)
+                count += 1
+                self.current_bar.emit(count)
             self.signal.emit('finish')
         except Exception as err:
             self.signal.emit(str(err))
@@ -592,7 +739,10 @@ class AppWindow(QMainWindow, Ui_MainWindow):
 
         self.train_run.setIcon(QIcon("Icon/addModel.png"))
         self.train_run.clicked.connect(self.train_models)
+        self.load_model.setIcon(QIcon("Icon/load.png"))
+        self.load_model.clicked.connect(self.load_models)
         self.train_run.setEnabled(False)
+        self.load_model.setEnabled(False)
 
         self.open_mix.setIcon(QIcon("Icon/open.png"))
         self.open_mix.clicked.connect(self.open_dir)
@@ -797,6 +947,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.add_spectra.setEnabled(True)
         self.delete_spectra.setEnabled(True)
         self.train_run.setEnabled(True)
+        self.load_model.setEnabled(True)
 
     def open_dir(self):
         global path_config
@@ -926,6 +1077,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             self.add_spectra.setEnabled(True)
             self.delete_spectra.setEnabled(True)
             self.train_run.setEnabled(True)
+            self.load_model.setEnabled(True)
 
     def add_spectra_to_group(self):
         global path_config
@@ -1011,6 +1163,52 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         item.setText(0, m)
         current_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (name,))[0][0]
         self.EasyDB.update('Groups', 'Group_Name=?', 'Group_ID=?', (m, current_id))
+
+    def load_models(self):
+        item = self.data_display.currentItem()
+        if not item:
+            return
+        if not item.childCount():
+            return
+        if self.train_on:
+            QMessageBox.information(self, "Information", 'Training process in progress')
+            return
+        self.link_widget = item
+        group = item.text(0)
+        group_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (group,))[0][0]
+        old_para = self.EasyDB.select('*', 'Group_Model_Info', 'From_Group=?', (group_id,))
+        if not old_para:
+            old_para = [group_id]
+        else:
+            old_para = old_para[0]
+        childwin = LoadModels(old_para=old_para)
+        childwin.move(self.geometry().x() + (self.geometry().width() - childwin.width()) // 2,
+                      self.geometry().y() + (self.geometry().height() - childwin.height()) // 2)
+        childwin.signal_parp.connect(self.get_load_signal)
+        childwin.exec_()
+
+    def get_load_signal(self, m):
+        QApplication.processEvents()
+        group_id = m[0]
+        correct_models = m[-1]
+        names_db = self.EasyDB.select('Component_Name', 'Component_Info', 'From_Group=?', (group_id,))
+        names = [n[0] for n in names_db]
+        for name in names:
+            if name in correct_models:
+                self.EasyDB.update('Component_Info', 'Model=?', 'Component_Name=? and From_Group=?',
+                                   (1, name, group_id))
+                self.link_widget.child(names.index(name)).setText(1, self.model_ref[1])
+            else:
+                self.EasyDB.update('Component_Info', 'Model=?', 'Component_Name=? and From_Group=?',
+                                   (0, name, group_id))
+                self.link_widget.child(names.index(name)).setText(1, self.model_ref[0])
+        old_para = self.EasyDB.select('*', 'Group_Model_Info', 'From_Group=?', (group_id,))
+        if not old_para:
+            self.EasyDB.insert('Group_Model_Info', '(?,?,?,?,?,?)', (m[1], m[2], m[3], '', m[4], group_id))
+        else:
+            self.EasyDB.update('Group_Model_Info', 'Raman_Start=?, Raman_End=?, Raman_Interval=?, Save_Path=?',
+                               'From_Group=?', (m[1], m[2], m[3], m[4], group_id))
+        QMessageBox.information(self, "Information", 'Complete Load Models')
 
     def click_to_plot(self):
         item = self.data_display.currentItem()
@@ -1196,6 +1394,9 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             childwin = TrainingReport(self.train_para)
             childwin.exec_()
         else:
+            self.progressBar.setValue(0)
+            self.progressBar.setTextVisible(False)
+            self.clear_text_1()
             QMessageBox.information(self, "Information", m)
 
     def get_max_bar_value(self, m):
@@ -1335,13 +1536,14 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             else:
                 self.progressBar_2.setTextVisible(True)
                 self.textBrowser_4.setText('Prediction')
-            self.pred_on = True
+                self.pred_on = True
         elif m == 'finished':
             self.progressBar_2.setValue(0)
             self.progressBar_2.setTextVisible(False)
             self.textBrowser_4.setText('Finished')
-            self.pred_on = False
-            self.ratios = None
+            if self.pred_on:
+                self.pred_on = False
+                self.ratios = None
             self.ratio_estimation.setEnabled(True)
             self.save_results.setEnabled(True)
             QTimer().singleShot(2000, self.clear_text_2)
@@ -1377,7 +1579,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
 
     def ratio_estimation_func(self):
         if self.RE_on:
-            QMessageBox.information(self, "Information", 'A prediction process is running')
+            QMessageBox.information(self, "Information", 'A ratio estimation process is running')
             return
         if not self.db:
             return
@@ -1495,14 +1697,15 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         last_path = path_config['OpenFiles']
         if last_path:
             save_path, ext = QFileDialog.getSaveFileName(self.centralwidget, "Choose result save path", last_path,
-                                                         "EXCEL(*.xlsx)")
+                                                         "EXCEL(*.csv)")
         else:
             save_path, ext = QFileDialog.getSaveFileName(self.centralwidget, "Choose result save path", "C:/",
-                                                         "EXCEL(*.xlsx)")
+                                                         "EXCEL(*.csv)")
         if not save_path:
             return
         path_config['OpenFiles'] = os.path.dirname(save_path)
-        self.thread_s = EXCELCreate(self.pred_names, self.result_list, self.ratios, save_path)
+        print(self.ratios)
+        self.thread_s = CSVCreate(self.pred_names, self.result_list, self.ratios, save_path)
         self.thread_s.signal.connect(self.get_save_thread_signal)
         self.thread_s.daemon = True
         self.thread_s.start()
@@ -1536,6 +1739,8 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         elif reply == QMessageBox.Yes:
             self.thread = DownloadDemo()
             self.thread.signal.connect(self.get_demo_thread_signal)
+            self.thread.current_bar.connect(self.get_current_bar_value)
+            self.thread.max_bar.connect(self.get_max_bar_value)
             self.thread.daemon = True
             self.thread.start()
         return
@@ -1543,7 +1748,9 @@ class AppWindow(QMainWindow, Ui_MainWindow):
     def get_demo_thread_signal(self, m):
         if m == 'run':
             self.textBrowser_3.setText('Download the demo of EasyCID')
-            self.progressBar.setMaximum(0)
+            self.progressBar.setTextVisible(True)
+            self.train_run.setEnabled(False)
+            self.load_model.setEnabled(False)
         elif m == 'finish':
             db_path = os.path.dirname(__file__) + "//demo//EasyCID_demo.db"
             AppWindow.connect_db(self, db_path)
@@ -1551,11 +1758,19 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             self.EasyDB.update('Group_Model_Info', 'Save_Path=?', 'From_Group=?', (models_path, 1))
             mixtures_path = os.path.dirname(__file__) + "//demo//mixtures"
             self.open_dir_func(mixtures_path)
-            self.progressBar.setMaximum(10)
+            self.progressBar.setValue(0)
+            self.progressBar.setTextVisible(False)
+            self.clear_text_1()
             self.textBrowser_3.setText('Finished')
             QTimer().singleShot(2000, self.clear_text_1)
+            self.train_run.setEnabled(True)
+            self.load_model.setEnabled(True)
         else:
-            self.progressBar.setMaximum(10)
+            self.progressBar.setValue(0)
+            self.progressBar.setTextVisible(False)
+            self.clear_text_1()
+            self.train_run.setEnabled(True)
+            self.load_model.setEnabled(True)
             QMessageBox.information(self, "Information", m)
 
     def closeEvent(self, event):

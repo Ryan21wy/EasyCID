@@ -1,7 +1,7 @@
 import pandas as pd
 
 
-def make_excel(mixtures, components, save_path, ratios=None):
+def make_csv(mixtures, components, save_path, ratios=None):
     data = []
     if ratios:
         for i in range(len(mixtures)):
@@ -21,4 +21,4 @@ def make_excel(mixtures, components, save_path, ratios=None):
                 else:
                     data.append([' ', components[mix][j]])
         df = pd.DataFrame(data, columns=['Mixture', 'Component'])
-    df.to_excel(save_path, index=False)
+    df.to_csv(save_path, index=False)
