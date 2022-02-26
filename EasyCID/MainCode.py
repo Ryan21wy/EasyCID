@@ -130,10 +130,10 @@ class TrainingParameterSetting(QDialog):
         end_shift = self.child.endshift.value()
         interval = self.child.interval.value()
         if end_shift <= start_shift:
-            QMessageBox.warning(self, "error", 'The end of Raman shift cannot be smaller than the start')
+            QMessageBox.warning(self, "Error", 'The end value of Raman shift cannot be smaller than the start value')
             return
         elif (end_shift - start_shift) < interval:
-            QMessageBox.warning(self, "error", 'The interval is too big')
+            QMessageBox.warning(self, "Error", 'The interval value is too big')
             return
         self.signal.append(start_shift)
         self.signal.append(end_shift)
@@ -152,7 +152,7 @@ class TrainingParameterSetting(QDialog):
         self.signal.append(nr)
         self.signal.append(self.child.aug_savepath.text())
         if not self.child.savepath.text():
-            QMessageBox.warning(self, "error", 'The save path cannot be empty!')
+            QMessageBox.warning(self, "Error", 'The save path cannot be empty!')
             return
         self.signal.append(self.child.savepath.text())
         self.signal_parp.emit(self.signal)
@@ -289,10 +289,10 @@ class LoadModels(QDialog):
         end_shift = self.child.endshift.value()
         interval = self.child.interval.value()
         if end_shift <= start_shift:
-            QMessageBox.warning(self, "error", 'The end of Raman shift cannot be smaller than the start')
+            QMessageBox.warning(self, "Error", 'The end value of Raman shift cannot be smaller than the start value')
             return
         elif (end_shift - start_shift) < interval:
-            QMessageBox.warning(self, "error", 'The interval is too big')
+            QMessageBox.warning(self, "Error", 'The interval value is too big')
             return
         correct_models = []
         x_test = np.arange(start_shift, end_shift, interval).reshape(1, -1)
@@ -308,11 +308,11 @@ class LoadModels(QDialog):
                     x_test = x_test.reshape(x_test.shape[0], x_test.shape[1], 1)
                     reload_model.predict(x_test)
                 except Exception as err:
-                    QMessageBox.warning(self, "error", str(err))
+                    QMessageBox.warning(self, "Error", str(err))
                     return
                 correct_models.append(file.split('.')[0])
         if not correct_models:
-            QMessageBox.warning(self, "error", 'No available models were found')
+            QMessageBox.warning(self, "Error", 'No CNN models available')
             return
         signal.append(self.group)
         signal.append(start_shift)
@@ -645,8 +645,6 @@ class DownloadDemo(QThread):
             count = 0
             self.current_bar.emit(count)
             t_dir = os.path.dirname(os.path.abspath(__file__))
-            print(t_dir)
-            # t_dir = os.path.dirname(abs_dir)
             components_path = os.path.join(t_dir, 'demo', 'components')
             mkdir(components_path)
             for com in components:
@@ -715,7 +713,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.open_database.setIcon(QIcon("Icon/opendb.png"))
         self.open_database.clicked.connect(self.open_db)
         self.build_database.setIcon(QIcon("Icon/builddb.png"))
-        self.build_database.clicked.connect(self.set_up_db)
+        self.build_database.clicked.connect(self.build_db)
 
         self.add_group.setIcon(QIcon("Icon/addGroup.png"))
         self.add_group.clicked.connect(self.load_spectra)
@@ -778,14 +776,11 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.data_list.doubleClicked.connect(self.click_to_plot_mix)
 
         self.data_display.doubleClicked.connect(self.click_to_plot)
-        # self.data_display.setContextMenuPolicy(Qt.CustomContextMenu)
         self.data_display.setColumnCount(2)
         self.data_display.setHeaderLabels([' Component ', ' Trained '])
         self.data_display.header().setStretchLastSection(False)
         self.data_display.header().setSectionResizeMode(QHeaderView.Stretch)
         self.data_display.header().setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        # self.data_display.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        # self.data_display.customContextMenuRequested.connect(self.data_display_menu)
 
         self.predict_result.itemChanged.connect(self.get_checked)
         self.predict_result.setColumnCount(2)
@@ -880,9 +875,9 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             AppWindow.db_data_display(self)
             self.add_group.setEnabled(True)
         except Exception as err:
-            QMessageBox.information(self, "Error", str(err))
+            QMessageBox.warning(self, "Error", str(err))
 
-    def set_up_db(self):
+    def build_db(self):
         global path_config
         last_path = path_config['OpenDB']
         if last_path:
@@ -953,9 +948,9 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         global path_config
         last_path = path_config['OpenFiles']
         if last_path:
-            self.data_path = QFileDialog.getExistingDirectory(self.centralwidget, "选取文件夹", last_path)
+            self.data_path = QFileDialog.getExistingDirectory(self.centralwidget, "choose folder", last_path)
         else:
-            self.data_path = QFileDialog.getExistingDirectory(self.centralwidget, "选取文件夹", "C:/")
+            self.data_path = QFileDialog.getExistingDirectory(self.centralwidget, "choose folder", "C:/")
         if not self.data_path:
             return
         path_config['OpenFiles'] = os.path.dirname(self.data_path)
@@ -974,7 +969,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             self.mix_data['it'].append(data[4])
             self.mix_list.append(data[1])
         if not self.mix_list:
-            QMessageBox.information(self, "Information", 'No available spectral data were found')
+            QMessageBox.information(self, "Information", 'No Raman spectral data available')
         data_list_model = QStringListModel()
         data_list_model.setStringList(self.mix_list)
         self.data_list.setModel(data_list_model)
@@ -1051,7 +1046,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         path_config['Import'] = os.path.dirname(spectra_path)
         datas = AppWindow.read_spectra(self, spectra_path)
         if not datas:
-            QMessageBox.information(self, "Information", 'No available spectral data were found')
+            QMessageBox.information(self, "Information", 'No Raman spectral data available')
             return
         group_db = self.EasyDB.select('Group_Name', 'Groups')
         name_list = [line[0] for line in group_db]
@@ -1088,15 +1083,15 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             return
         last_path = path_config['Import']
         if last_path:
-            spectra_path = QFileDialog.getExistingDirectory(self.centralwidget, "选取文件夹", last_path)
+            spectra_path = QFileDialog.getExistingDirectory(self.centralwidget, "choose folder", last_path)
         else:
-            spectra_path = QFileDialog.getExistingDirectory(self.centralwidget, "选取文件夹", "C:/")
+            spectra_path = QFileDialog.getExistingDirectory(self.centralwidget, "choose folder", "C:/")
         if not spectra_path:
             return
         path_config['Import'] = os.path.dirname(spectra_path)
         datas = AppWindow.read_spectra(self, spectra_path)
         if not datas:
-            QMessageBox.information(self, "Information", 'No available spectral data were found')
+            QMessageBox.information(self, "Information", 'No Raman spectral data available')
             return
         group_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (item.text(0),))[0][0]
         for i in range(len(datas)):
@@ -1115,7 +1110,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         if not item.childCount():
             name = item.text(0)
             group_name = item.parent().text(0)
-            reply = QMessageBox.question(self.centralwidget, 'Delete', "Do you want to detele '%s' ?" % name,
+            reply = QMessageBox.question(self.centralwidget, 'Confirm Delete', "Do you want to detele '%s' ?" % name,
                                          QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
             if reply == QMessageBox.Yes:
                 current_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (group_name,))[0][0]
@@ -1132,8 +1127,8 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             return
         if item.childCount():
             group_name = item.text(0)
-            reply = QMessageBox.question(self.centralwidget, 'Delete', 'Do you want to detele Table "%s" ?' % group_name
-                                         , QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel, QMessageBox.Cancel)
+            reply = QMessageBox.question(self.centralwidget, 'Confirm Delete', 'Do you want to detele Table "%s" ?' %
+                                         group_name, QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
             if reply == QMessageBox.Yes:
                 self.EasyDB.delete('Groups', 'Group_Name=?', (group_name,))
                 index = self.data_display.indexOfTopLevelItem(item)
@@ -1158,7 +1153,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             if m == name:
                 return
             else:
-                QMessageBox.information(self, "Information", 'Already have Table called "%s"' % m)
+                QMessageBox.information(self, "Information", 'Already have Spectra Group called "%s"' % m)
                 return
         item.setText(0, m)
         current_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (name,))[0][0]
@@ -1216,7 +1211,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             self.change_group_name(item)
             return
         if self.plot_lock:
-            QMessageBox.information(self, "Information", 'Please wait until result save process finished')
+            QMessageBox.warning(self, "Conflicts", 'Please wait until saving process finished')
             return
         name = item.text(0)
         group = item.parent().text(0)
@@ -1235,7 +1230,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
 
     def click_to_plot_mix(self):
         if self.plot_lock:
-            QMessageBox.information(self, "Information", 'Please wait until result save process finished')
+            QMessageBox.warning(self, "Conflicts", 'Please wait until saving process finished')
             return
         idx = self.data_list.currentIndex().row()
         name = self.mix_list[idx]
@@ -1268,7 +1263,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
 
     def train_models(self):
         if self.train_on:
-            QMessageBox.information(self, "Information", 'A training process is running')
+            QMessageBox.warning(self, "Conflicts", 'A training process is running')
             return
         item = self.data_display.currentItem()
         if not item:
@@ -1316,12 +1311,15 @@ class AppWindow(QMainWindow, Ui_MainWindow):
                 self.train_com_name.append(name[0])
             jug = self.EasyDB.select('Component_Name', 'Component_Info', 'Model=1 and From_Group=?', (group_id,))
             if jug:
-                reply = QMessageBox.question(self, 'Train', "Already have some models \n "
-                                                            "Do you want to re-train them?",
-                                             QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel, QMessageBox.Cancel)
-                if reply == QMessageBox.Yes:
+                messageBox = QMessageBox(QMessageBox.Question, "Training", "Already have some models \n "
+                                                                           "Retrain them or Skip?")
+                Qyes = messageBox.addButton(self.tr("Retrain"), QMessageBox.YesRole)
+                Qno = messageBox.addButton(self.tr("Skip"), QMessageBox.NoRole)
+                QCancel = messageBox.addButton(QMessageBox.Cancel)
+                messageBox.exec_()
+                if messageBox.clickedButton() == Qyes:
                     self.train_index = list(np.arange(0, len(self.train_com_name)))
-                elif reply == QMessageBox.No:
+                elif messageBox.clickedButton() == Qno:
                     components = self.EasyDB.select('Component_Name', 'Component_Info', 'Model=0 and From_Group=?',
                                                     (group_id,))
                     if not components:
@@ -1473,7 +1471,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
 
     def predict_process_func(self):
         if self.pred_on:
-            QMessageBox.information(self, "Information", 'A prediction process is running')
+            QMessageBox.warning(self, "Conflicts", 'A prediction process is running')
             return
         if not self.db:
             return
@@ -1499,7 +1497,6 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.candidate_model = []
         model_path_list = []
         models_path = os.path.abspath(group_para[-2])
-        print(models_path)
         dir = os.listdir(models_path)
         for file in dir:
             if os.path.isfile(os.path.join(group_para[-2], file)):
@@ -1508,7 +1505,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
                     model_path_list.append(os.path.join(models_path, file))
                     self.candidate_model.append(name)
         if not model_path_list:
-            QMessageBox.information(self, "Information", 'No available models')
+            QMessageBox.information(self, "Information", 'No CNN models available')
             return
         self.pred_data = self.get_pred_data(self.axis)
         if self.pred_data is None:
@@ -1579,7 +1576,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
 
     def ratio_estimation_func(self):
         if self.RE_on:
-            QMessageBox.information(self, "Information", 'A ratio estimation process is running')
+            QMessageBox.warning(self, "Conflicts", 'A ratio estimation process is running')
             return
         if not self.db:
             return
@@ -1653,7 +1650,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
 
     def get_checked(self, item):
         if self.plot_lock:
-            QMessageBox.information(self, "Information", 'Please wait until saving process finished')
+            QMessageBox.warning(self, "Conflicts", 'Please wait until saving process finished')
             return
         pred = ''
         component_list = []
@@ -1704,7 +1701,6 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         if not save_path:
             return
         path_config['OpenFiles'] = os.path.dirname(save_path)
-        print(self.ratios)
         self.thread_s = CSVCreate(self.pred_names, self.result_list, self.ratios, save_path)
         self.thread_s.signal.connect(self.get_save_thread_signal)
         self.thread_s.daemon = True
@@ -1729,7 +1725,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
 
     def download_demo(self):
         if self.train_on:
-            QMessageBox.information(self, "Information", 'Training process in progress')
+            QMessageBox.warning(self, "Conflicts", 'Training process in progress')
             return
         reply = QMessageBox.question(self, 'download demo', 'It will takes a few minutes to download a demo of '
                                                             'EasyCID. Do you want to continue?',
