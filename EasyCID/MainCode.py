@@ -26,7 +26,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
 # from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtWidgets import QApplication, QMainWindow, QGridLayout, QAbstractItemView, \
-    QFileDialog, QDialog, QMessageBox, QTreeWidgetItem, QMenu, QHeaderView, QSizePolicy
+    QFileDialog, QDialog, QMessageBox, QTreeWidgetItem, QMenu, QHeaderView, QSizePolicy, QPushButton
 from PyQt5.QtCore import Qt, QThread, QStringListModel, pyqtSignal, QTimer
 from PyQt5.QtGui import QIcon, QStandardItemModel, QStandardItem, QFont
 from matplotlib.figure import Figure
@@ -53,6 +53,38 @@ from EasyCID.Windows import GroupName_win, PredictionParameter_win, TrainingRepo
 path_config = {'OpenDB': '', 'OpenFiles': '', 'Import': '', 'Models': '', 'Augment': ''}
 
 
+class MessageDisplay:
+    def information(self, titlt, text):
+        messageBox = QMessageBox(QMessageBox.Information, titlt, text)
+        messageBox.setWindowIcon(QIcon("Icon/EasyCIDlogo.png"))
+        messageBox.addButton("OK", QMessageBox.YesRole)
+        messageBox.exec_()
+
+    def warning(self, titlt, text):
+        messageBox = QMessageBox(QMessageBox.Warning, titlt, text)
+        messageBox.setWindowIcon(QIcon("Icon/EasyCIDlogo.png"))
+        messageBox.addButton("OK", QMessageBox.YesRole)
+        messageBox.exec_()
+
+    def question(self, titlt, text, btn1, btn2, btn3=None, default=-1):
+        messageBox = QMessageBox(QMessageBox.Question, titlt, text)
+        messageBox.setWindowIcon(QIcon("Icon/EasyCIDlogo.png"))
+        Qyes = messageBox.addButton(btn1, QMessageBox.YesRole)
+        Qno = messageBox.addButton(btn2, QMessageBox.NoRole)
+        messageboxs = [Qyes, Qno]
+        if btn3:
+            Qcancel = messageBox.addButton(btn3, QMessageBox.NoRole)
+            messageboxs.append(Qcancel)
+        messageBox.setDefaultButton(messageboxs[default])
+        messageBox.exec_()
+        if messageBox.clickedButton() == Qyes:
+            return btn1
+        elif messageBox.clickedButton() == Qno:
+            return btn2
+        else:
+            return
+
+
 class TrainingParameterSetting(QDialog):
     signal_parp = pyqtSignal(list)
 
@@ -60,6 +92,7 @@ class TrainingParameterSetting(QDialog):
         QDialog.__init__(self)
         self.child = TrainingParameter_win.Ui_Dialog()
         self.child.setupUi(self)
+        self.setWindowIcon(QIcon("Icon/EasyCIDlogo.png"))
         self.child.dir_choose.setIcon(QIcon('Icon/view.png'))
         self.child.aug_choose.setIcon(QIcon('Icon/view.png'))
         self.child.dir_choose.clicked.connect(self.model_path_chose)
@@ -130,10 +163,10 @@ class TrainingParameterSetting(QDialog):
         end_shift = self.child.endshift.value()
         interval = self.child.interval.value()
         if end_shift <= start_shift:
-            QMessageBox.warning(self, "Error", 'The end value of Raman shift cannot be smaller than the start value')
+            MessageDisplay.warning(self, "Error", 'The end value of Raman shift cannot be smaller than the start value')
             return
         elif (end_shift - start_shift) < interval:
-            QMessageBox.warning(self, "Error", 'The interval value is too big')
+            MessageDisplay.warning(self, "Error", 'The interval value is too big')
             return
         self.signal.append(start_shift)
         self.signal.append(end_shift)
@@ -152,7 +185,7 @@ class TrainingParameterSetting(QDialog):
         self.signal.append(nr)
         self.signal.append(self.child.aug_savepath.text())
         if not self.child.savepath.text():
-            QMessageBox.warning(self, "Error", 'The save path cannot be empty!')
+            MessageDisplay.warning(self, "Error", 'The save path cannot be empty!')
             return
         self.signal.append(self.child.savepath.text())
         self.signal_parp.emit(self.signal)
@@ -167,6 +200,7 @@ class TrainingReport(QDialog):
         QDialog.__init__(self)
         self.child = TrainingReport_win.Ui_Dialog()
         self.child.setupUi(self)
+        self.setWindowIcon(QIcon("Icon/EasyCIDlogo.png"))
         self.parameters = parameters
         self.names = list(parameters.keys())
         self.child.tableView.clicked.connect(self.plot)
@@ -225,6 +259,7 @@ class ChangeName(QDialog):
         QDialog.__init__(self)
         self.child = GroupName_win.Ui_Dialog()
         self.child.setupUi(self)
+        self.setWindowIcon(QIcon("Icon/EasyCIDlogo.png"))
         self.init_name = init_name
         self.child.name.setText(init_name)
         self.child.save_.clicked.connect(self.signal_emit)
@@ -246,6 +281,7 @@ class LoadModels(QDialog):
         QDialog.__init__(self)
         self.child = LoadModels_win.Ui_Dialog()
         self.child.setupUi(self)
+        self.setWindowIcon(QIcon("Icon/EasyCIDlogo.png"))
         if len(old_para) > 1:
             self.child.startshift.setValue(old_para[0])
             self.child.endshift.setValue(old_para[1])
@@ -289,10 +325,10 @@ class LoadModels(QDialog):
         end_shift = self.child.endshift.value()
         interval = self.child.interval.value()
         if end_shift <= start_shift:
-            QMessageBox.warning(self, "Error", 'The end value of Raman shift cannot be smaller than the start value')
+            MessageDisplay.warning(self, "Error", 'The end value of Raman shift cannot be smaller than the start value')
             return
         elif (end_shift - start_shift) < interval:
-            QMessageBox.warning(self, "Error", 'The interval value is too big')
+            MessageDisplay.warning(self, "Error", 'The interval value is too big')
             return
         correct_models = []
         x_test = np.arange(start_shift, end_shift, interval).reshape(1, -1)
@@ -308,11 +344,11 @@ class LoadModels(QDialog):
                     x_test = x_test.reshape(x_test.shape[0], x_test.shape[1], 1)
                     reload_model.predict(x_test)
                 except Exception as err:
-                    QMessageBox.warning(self, "Error", str(err))
+                    MessageDisplay.warning(self, "Error", str(err))
                     return
                 correct_models.append(file.split('.')[0])
         if not correct_models:
-            QMessageBox.warning(self, "Error", 'No CNN models available')
+            MessageDisplay.warning(self, "Error", 'No CNN models available')
             return
         signal.append(self.group)
         signal.append(start_shift)
@@ -334,6 +370,7 @@ class RatioEstimationSetting(QDialog):
         QDialog.__init__(self)
         self.child = RatioEstimation_win.Ui_dialog()
         self.child.setupUi(self)
+        self.setWindowIcon(QIcon("Icon/EasyCIDlogo.png"))
 
         self.widget_1(False)
         self.widget_2(False)
@@ -395,6 +432,7 @@ class PredictionSetting(QDialog):
         QDialog.__init__(self)
         self.child = PredictionParameter_win.Ui_dialog()
         self.child.setupUi(self)
+        self.setWindowIcon(QIcon("Icon/EasyCIDlogo.png"))
         for item in table_list:
             self.child.comboBox.addItem(item)
         self.child.OK.clicked.connect(self.signal_emit)
@@ -710,6 +748,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
     def __init__(self, parent=None):
         super(AppWindow, self).__init__(parent)
         self.setupUi(self)
+        self.setWindowIcon(QIcon("Icon/EasyCIDlogo.png"))
         self.open_database.setIcon(QIcon("Icon/opendb.png"))
         self.open_database.clicked.connect(self.open_db)
         self.build_database.setIcon(QIcon("Icon/builddb.png"))
@@ -875,7 +914,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             AppWindow.db_data_display(self)
             self.add_group.setEnabled(True)
         except Exception as err:
-            QMessageBox.warning(self, "Error", str(err))
+            MessageDisplay.warning(self, "Error", str(err))
 
     def build_db(self):
         global path_config
@@ -969,7 +1008,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             self.mix_data['it'].append(data[4])
             self.mix_list.append(data[1])
         if not self.mix_list:
-            QMessageBox.information(self, "Information", 'No Raman spectral data available')
+            MessageDisplay.information(self, "Information", 'No Raman spectral data available')
         data_list_model = QStringListModel()
         data_list_model.setStringList(self.mix_list)
         self.data_list.setModel(data_list_model)
@@ -1046,7 +1085,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         path_config['Import'] = os.path.dirname(spectra_path)
         datas = AppWindow.read_spectra(self, spectra_path)
         if not datas:
-            QMessageBox.information(self, "Information", 'No Raman spectral data available')
+            MessageDisplay.information(self, "Information", 'No Raman spectral data available')
             return
         group_db = self.EasyDB.select('Group_Name', 'Groups')
         name_list = [line[0] for line in group_db]
@@ -1091,7 +1130,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         path_config['Import'] = os.path.dirname(spectra_path)
         datas = AppWindow.read_spectra(self, spectra_path)
         if not datas:
-            QMessageBox.information(self, "Information", 'No Raman spectral data available')
+            MessageDisplay.information(self, "Information", 'No Raman spectral data available')
             return
         group_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (item.text(0),))[0][0]
         for i in range(len(datas)):
@@ -1110,9 +1149,8 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         if not item.childCount():
             name = item.text(0)
             group_name = item.parent().text(0)
-            reply = QMessageBox.question(self.centralwidget, 'Confirm Delete', "Do you want to detele '%s' ?" % name,
-                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-            if reply == QMessageBox.Yes:
+            reply = MessageDisplay.question(self, 'Confirm Delete', "Do you want to detele '%s' ?" % name, "Yes", "No")
+            if reply == "Yes":
                 current_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (group_name,))[0][0]
                 self.EasyDB.delete('Component_Info', 'Component_Name=? and From_Group=?', (name, current_id))
                 item.parent().removeChild(item)
@@ -1127,9 +1165,9 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             return
         if item.childCount():
             group_name = item.text(0)
-            reply = QMessageBox.question(self.centralwidget, 'Confirm Delete', 'Do you want to detele Table "%s" ?' %
-                                         group_name, QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-            if reply == QMessageBox.Yes:
+            reply = MessageDisplay.question(self, 'Confirm Delete', 'Do you want to detele Table "%s" ?' % group_name,
+                                            "Yes", "No")
+            if reply == "Yes":
                 self.EasyDB.delete('Groups', 'Group_Name=?', (group_name,))
                 index = self.data_display.indexOfTopLevelItem(item)
                 self.data_display.takeTopLevelItem(index)
@@ -1153,7 +1191,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             if m == name:
                 return
             else:
-                QMessageBox.information(self, "Information", 'Already have Spectra Group called "%s"' % m)
+                MessageDisplay.information(self, "Information", 'Already have Spectra Group called "%s"' % m)
                 return
         item.setText(0, m)
         current_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (name,))[0][0]
@@ -1166,7 +1204,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         if not item.childCount():
             return
         if self.train_on:
-            QMessageBox.information(self, "Information", 'Training process in progress')
+            MessageDisplay.information(self, "Information", 'Training process in progress')
             return
         self.link_widget = item
         group = item.text(0)
@@ -1203,7 +1241,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         else:
             self.EasyDB.update('Group_Model_Info', 'Raman_Start=?, Raman_End=?, Raman_Interval=?, Save_Path=?',
                                'From_Group=?', (m[1], m[2], m[3], m[4], group_id))
-        QMessageBox.information(self, "Information", 'Complete Load Models')
+        MessageDisplay.information(self, "Information", 'Complete Load Models')
 
     def click_to_plot(self):
         item = self.data_display.currentItem()
@@ -1211,7 +1249,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             self.change_group_name(item)
             return
         if self.plot_lock:
-            QMessageBox.warning(self, "Conflicts", 'Please wait until saving process finished')
+            MessageDisplay.warning(self, "Conflicts", 'Please wait until saving process finished')
             return
         name = item.text(0)
         group = item.parent().text(0)
@@ -1230,7 +1268,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
 
     def click_to_plot_mix(self):
         if self.plot_lock:
-            QMessageBox.warning(self, "Conflicts", 'Please wait until saving process finished')
+            MessageDisplay.warning(self, "Conflicts", 'Please wait until saving process finished')
             return
         idx = self.data_list.currentIndex().row()
         name = self.mix_list[idx]
@@ -1263,7 +1301,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
 
     def train_models(self):
         if self.train_on:
-            QMessageBox.warning(self, "Conflicts", 'A training process is running')
+            MessageDisplay.warning(self, "Conflicts", 'A training process is running')
             return
         item = self.data_display.currentItem()
         if not item:
@@ -1283,11 +1321,11 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             for name in names:
                 self.train_com_name.append(name[0])
             if item.text(2) == 'Yes':
-                reply = QMessageBox.question(self, 'Train', 'Do you want to re-train "%s"?' % item.text(0),
-                                             QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
-                if reply == QMessageBox.No:
+                reply = MessageDisplay.question(self, 'Train', 'Do you want to re-train "%s"?' % item.text(0),
+                                                "Retrain", "No")
+                if reply == "No":
                     return
-                elif reply == QMessageBox.Yes:
+                elif reply == "Retrain":
                     self.train_index = [self.train_com_name.index(item.text(0))]
                 else:
                     return
@@ -1311,15 +1349,11 @@ class AppWindow(QMainWindow, Ui_MainWindow):
                 self.train_com_name.append(name[0])
             jug = self.EasyDB.select('Component_Name', 'Component_Info', 'Model=1 and From_Group=?', (group_id,))
             if jug:
-                messageBox = QMessageBox(QMessageBox.Question, "Training", "Already have some models \n "
-                                                                           "Retrain them or Skip?")
-                Qyes = messageBox.addButton(self.tr("Retrain"), QMessageBox.YesRole)
-                Qno = messageBox.addButton(self.tr("Skip"), QMessageBox.NoRole)
-                QCancel = messageBox.addButton(QMessageBox.Cancel)
-                messageBox.exec_()
-                if messageBox.clickedButton() == Qyes:
+                reply = MessageDisplay.question(self, "Train", "Already have some models \n Retrain them or Skip?",
+                                                "Retrain", "Skip", "Cancel")
+                if reply == "Retrain":
                     self.train_index = list(np.arange(0, len(self.train_com_name)))
-                elif messageBox.clickedButton() == Qno:
+                elif reply == "Skip":
                     components = self.EasyDB.select('Component_Name', 'Component_Info', 'Model=0 and From_Group=?',
                                                     (group_id,))
                     if not components:
@@ -1397,7 +1431,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             self.progressBar.setValue(0)
             self.progressBar.setTextVisible(False)
             self.clear_text_1()
-            QMessageBox.information(self, "Information", m)
+            MessageDisplay.information(self, "Information", m)
 
     def get_max_bar_value(self, m):
         self.progressBar.setMaximum(m)
@@ -1412,7 +1446,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.textBrowser_3.setText(m)
 
     def get_train_err_signal(self, m):
-        QMessageBox.information(self, "Information", m)
+        MessageDisplay.information(self, "Information", m)
         self.train_on = False
         self.progressBar.setMinimum(0)
         self.progressBar.setMaximum(100)
@@ -1473,7 +1507,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
 
     def predict_process_func(self):
         if self.pred_on:
-            QMessageBox.warning(self, "Conflicts", 'A prediction process is running')
+            MessageDisplay.warning(self, "Conflicts", 'A prediction process is running')
             return
         if not self.db:
             return
@@ -1491,10 +1525,10 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         group_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (self.pred_group,))[0][0]
         component_db = self.EasyDB.select('Component_Name', 'Component_Info', 'Model=1 and From_Group=?', (group_id,))
         component_list = [c[0] for c in component_db]
-        group_para = self.EasyDB.select('*', 'Group_Model_Info', 'From_Group=?', (group_id,))[0]
-        if not group_para:
-            QMessageBox.information(self, "Information", 'No available models')
+        if not component_list:
+            MessageDisplay.information(self, "Information", 'No available models')
             return
+        group_para = self.EasyDB.select('*', 'Group_Model_Info', 'From_Group=?', (group_id,))[0]
         self.axis = np.arange(group_para[0], group_para[1], group_para[2])
         self.candidate_model = []
         model_path_list = []
@@ -1507,11 +1541,11 @@ class AppWindow(QMainWindow, Ui_MainWindow):
                     model_path_list.append(os.path.join(models_path, file))
                     self.candidate_model.append(name)
         if not model_path_list:
-            QMessageBox.information(self, "Information", 'No CNN models available')
+            MessageDisplay.information(self, "Information", 'No CNN models available')
             return
         self.pred_data = self.get_pred_data(self.axis)
         if self.pred_data is None:
-            QMessageBox.information(self, "Information", 'Missing spectra to be analyzed')
+            MessageDisplay.information(self, "Information", 'Missing spectra to be analyzed')
             return
         self.thread_2 = PredictionRun(self.pred_data, model_path_list)
         self.thread_2.signal.connect(self.get_pred_thread_signal)
@@ -1547,7 +1581,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             self.save_results.setEnabled(True)
             QTimer().singleShot(2000, self.clear_text_2)
         else:
-            QMessageBox.information(self, "Information", m)
+            MessageDisplay.information(self, "Information", m)
             self.progressBar_2.setValue(0)
             self.progressBar_2.setTextVisible(False)
             self.textBrowser_4.setText('')
@@ -1578,7 +1612,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
 
     def ratio_estimation_func(self):
         if self.RE_on:
-            QMessageBox.warning(self, "Conflicts", 'A ratio estimation process is running')
+            MessageDisplay.warning(self, "Conflicts", 'A ratio estimation process is running')
             return
         if not self.db:
             return
@@ -1652,7 +1686,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
 
     def get_checked(self, item):
         if self.plot_lock:
-            QMessageBox.warning(self, "Conflicts", 'Please wait until saving process finished')
+            MessageDisplay.warning(self, "Conflicts", 'Please wait until saving process finished')
             return
         pred = ''
         component_list = []
@@ -1720,21 +1754,21 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             self.plot_lock = False
             QTimer().singleShot(2000, self.clear_text_2)
         else:
-            QMessageBox.information(self, "Information", m)
+            MessageDisplay.information(self, "Information", m)
             self.progressBar_2.setMaximum(100)
             self.textBrowser_4.setText('')
             self.plot_lock = False
 
     def download_demo(self):
         if self.train_on:
-            QMessageBox.warning(self, "Conflicts", 'Training process in progress')
+            MessageDisplay.warning(self, "Conflicts", 'Training process in progress')
             return
-        reply = QMessageBox.question(self, 'download demo', 'It will takes a few minutes to download a demo of '
-                                                            'EasyCID. Do you want to continue?',
-                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
-        if reply == QMessageBox.No:
+        reply = MessageDisplay.question(self, 'download demo', 'It will takes a few minutes to download a demo of '
+                                                               'EasyCID. Do you want to continue?',
+                                        "Continue", "No", default=0)
+        if reply == "No":
             return
-        elif reply == QMessageBox.Yes:
+        elif reply == "Continue":
             self.thread = DownloadDemo()
             self.thread.signal.connect(self.get_demo_thread_signal)
             self.thread.current_bar.connect(self.get_current_bar_value)
@@ -1769,20 +1803,19 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             self.clear_text_1()
             self.train_run.setEnabled(True)
             self.load_model.setEnabled(True)
-            QMessageBox.information(self, "Information", m)
+            MessageDisplay.information(self, "Information", m)
 
     def closeEvent(self, event):
-        messageBox = QMessageBox(QMessageBox.Question, "Confirm Exit", "Are you sure you want to exit EasyCID?")
-        Qyes = messageBox.addButton(self.tr("Exit"), QMessageBox.YesRole)
-        Qno = messageBox.addButton(self.tr("Cancel"), QMessageBox.NoRole)
-        messageBox.exec_()
-        if messageBox.clickedButton() == Qyes:
+        reply = MessageDisplay.question(self, "Confirm Exit", "Are you sure you want to exit EasyCID?",
+                                        "Exit", "Cancel")
+        print(reply)
+        if reply == "Exit":
             global path_config
             info_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'PathConfig.json')
             with open(info_path, 'w') as fp:
                 json.dump(path_config, fp)
             event.accept()
-        elif messageBox.clickedButton() == Qno:
+        elif reply == "Cancel":
             event.ignore()
 
 
