@@ -46,8 +46,8 @@ from EasyCID.Utils.database import EasyCIDDatabase as EasyDB
 from EasyCID.Utils.downloadDemo import get_url_info, nameTrans, download
 # windows of EasyCID
 from EasyCID.Windows.MainWindow import Ui_MainWindow
-from EasyCID.Windows import TableName_win, PredictionParameter_win, TrainingReport_win, \
-    RatioEstimation_win, TrainingParameter_win, LinkModels_win
+from EasyCID.Windows import GroupName_win, PredictionParameter_win, TrainingReport_win, \
+    RatioEstimation_win, TrainingParameter_win, LoadModels_win
 
 
 path_config = {'OpenDB': '', 'OpenFiles': '', 'Import': '', 'Models': '', 'Augment': ''}
@@ -223,7 +223,7 @@ class ChangeName(QDialog):
 
     def __init__(self, init_name):
         QDialog.__init__(self)
-        self.child = TableName_win.Ui_Dialog()
+        self.child = GroupName_win.Ui_Dialog()
         self.child.setupUi(self)
         self.init_name = init_name
         self.child.name.setText(init_name)
@@ -244,7 +244,7 @@ class LoadModels(QDialog):
 
     def __init__(self, old_para=None):
         QDialog.__init__(self)
-        self.child = LinkModels_win.Ui_Dialog()
+        self.child = LoadModels_win.Ui_Dialog()
         self.child.setupUi(self)
         if len(old_para) > 1:
             self.child.startshift.setValue(old_para[0])
@@ -589,7 +589,7 @@ class RatioEstimationRun(QThread):
                         com_spectra[i] = com_spectra[i] - airPLS(com_spectra[i], int(sb_param[0]), int(sb_param[1]),
                                                                  int(sb_param[2]))
                 _, coefs_lasso, _ = enet_path(com_spectra.T, m, l1_ratio=float(en_param[0]),
-                                              n_alphas=int(en_param[1]), positive=True, fit_intercept=False)
+                                              n_alphas=int(en_param[1]), positive=True)
                 ratio = coefs_lasso[:, -1]
                 ratio = ratio / sum(ratio)
                 ratio[-1] = 1 - sum(ratio[:-1])
@@ -1359,8 +1359,10 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         AppWindow.training_strat(self, m[3:], self.train_index, self.t_axis, self.t_new_axis)
 
     def training_strat(self, sp, count, axis, new_axis):
-        optimizer_list = [tf.keras.optimizers.Adam(lr=sp[1]), tf.keras.optimizers.Adadelta(lr=sp[1]),
-                          tf.keras.optimizers.Adagrad(lr=sp[1]), tf.keras.optimizers.Adamax(lr=sp[1])]
+        optimizer_list = [tf.keras.optimizers.Adam(learning_rate=sp[1]),
+                          tf.keras.optimizers.Adadelta(learning_rate=sp[1]),
+                          tf.keras.optimizers.Adagrad(learning_rate=sp[1]),
+                          tf.keras.optimizers.Adamax(learning_rate=sp[1])]
         optimizer = optimizer_list[sp[0]]
         train_para = [optimizer, sp[2], sp[3], sp[-1]]
         aug_para = sp[4:7]

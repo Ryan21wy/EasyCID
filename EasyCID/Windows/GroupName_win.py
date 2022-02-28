@@ -34,7 +34,7 @@ class Ui_Dialog(object):
 
     def retranslateUi(self, Dialog):
         _translate = QtCore.QCoreApplication.translate
-        Dialog.setWindowTitle(_translate("Dialog", "Modify table name"))
+        Dialog.setWindowTitle(_translate("Dialog", "Modify Group name"))
         self.save_.setText(_translate("Dialog", "save"))
         self.reset_.setText(_translate("Dialog", "reset"))
-        self.label.setText(_translate("Dialog", "  Table Name："))
+        self.label.setText(_translate("Dialog", "  Group Name："))
