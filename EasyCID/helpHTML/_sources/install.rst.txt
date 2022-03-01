@@ -20,14 +20,15 @@ If you want to run EasyCID on your PC, the recommanded system requirements are a
 
 **Operating Systems**
 	* Windows 7
-	* Windows 8
 	* Windows 10
 
 **Recommanded Hardware**
 	* GPU compute capability 3.5 or greater (visit `NVIDIA DEVELOPER <https://developer.nvidia.com/cuda-gpus#compute>`_)
 
 	* CUDA and cuDNN
-	* Intel Core i7 or greater
+	* Intel Core i5 or greater
 	* 4 GB RAM or more
 	* 3GB hard drive space
 	* monitor with 1024×768 pixels or higher
+
+If your PC does not have the recommended configuration, you can run EasyCID, but it may take a little longer to train the CNN models.

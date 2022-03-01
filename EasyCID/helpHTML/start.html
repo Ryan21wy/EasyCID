@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Quickly Start EasyCID &mdash; DeepCID_GUI Documentation 1.0 documentation</title>
+  <title>Quickly Start EasyCID &mdash; EasyCID Documentation 1.0 documentation</title>
       <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -27,7 +27,7 @@
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-            <a href="index.html" class="icon icon-home"> DeepCID_GUI Documentation
+            <a href="index.html" class="icon icon-home"> EasyCID Documentation
           </a>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
@@ -41,18 +41,17 @@
 <li class="toctree-l1"><a class="reference internal" href="intro.html">Quick EasyCID Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="install.html">Install EasyCID</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Quickly Start EasyCID</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#set-up-a-new-database">Set up a new database</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#link-to-database">link to database</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#build-new-database">build new database</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#open-database">open database</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#import-spectra-of-pure-components">Import Spectra of pure components</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#training-the-cnn-models">Training the CNN models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#load-models">Load Models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#perform-analysis">Perform analysis</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#quantitative-analysis">Quantitative Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#ratio-estimation">Ratio Estimation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#save-results">Save Results</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="concept.html">Basic Concepts</a></li>
-<li class="toctree-l1"><a class="reference internal" href="menu_toolbar.html">Menu &amp; Toolbar</a></li>
 </ul>
 
         </div>
@@ -61,7 +60,7 @@
 
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="index.html">DeepCID_GUI Documentation</a>
+          <a href="index.html">EasyCID Documentation</a>
       </nav>
 
       <div class="wy-nav-content">
@@ -81,19 +80,19 @@
   <section id="quickly-start-easycid">
 <h1>Quickly Start EasyCID<a class="headerlink" href="#quickly-start-easycid" title="Permalink to this headline"></a></h1>
 <p>This sub-section delivers you a brief introduction on how to use EasyCID. If EasyCID has been installed following the previous sub-section, it can be started by double clicking its icon on the desktop or single clicking from the start-menu of windows operation system. The Main Window of EasyCID is shown below:</p>
-<a class="reference internal image-reference" href="_images/Main_Window.png"><img alt="_images/Main_Window.png" src="_images/Main_Window.png" style="width: 600px;" /></a>
-<section id="set-up-a-new-database">
-<h2>Set up a new database<a class="headerlink" href="#set-up-a-new-database" title="Permalink to this headline"></a></h2>
-<p>EasyCID uses a local database based on sqlite to manage Raman spectral data. In order to set up a new database, please select <strong>Database/set up new database</strong> in the menu of EasyCID. Then EasyCID will automatically link to the new database and give a tip message in the <strong>Main Window</strong>.</p>
-<a class="reference internal image-reference" href="_images/Link_Over.png"><img alt="_images/Link_Over.png" src="_images/Link_Over.png" style="width: 500px;" /></a>
+<a class="reference internal image-reference" href="_images/Main_Window.png"><img alt="_images/Main_Window.png" src="_images/Main_Window.png" style="width: 700px;" /></a>
+<section id="build-new-database">
+<h2>build new database<a class="headerlink" href="#build-new-database" title="Permalink to this headline"></a></h2>
+<p>EasyCID uses a local database based on sqlite to manage Raman spectral data. In order to set up a new database, please select <strong>Data/build</strong> in the menu of database. Then EasyCID will automatically link to the new database and give a tip message in the <strong>Main Window</strong>.</p>
+<a class="reference internal image-reference" href="_images/open_database.png"><img alt="_images/open_database.png" src="_images/open_database.png" style="width: 700px;" /></a>
 </section>
-<section id="link-to-database">
-<h2>link to database<a class="headerlink" href="#link-to-database" title="Permalink to this headline"></a></h2>
-<p>If you already have a built database, In order to link to this database, please select <strong>Database/link to database</strong> in the menu of EasyCID. <em>Note that only databases created through EasyCID can be successfully connected.</em></p>
+<section id="open-database">
+<h2>open database<a class="headerlink" href="#open-database" title="Permalink to this headline"></a></h2>
+<p>If you already have a built database, In order to link to this database, please select <strong>Data/build</strong> in the menu of database. <em>Note that only databases created through EasyCID can be successfully connected.</em></p>
 </section>
 <section id="import-spectra-of-pure-components">
 <h2>Import Spectra of pure components<a class="headerlink" href="#import-spectra-of-pure-components" title="Permalink to this headline"></a></h2>
-<p>To carry out the next modeling process, the spectra file of pure components should be imported into Database firstly. In order to import spectra, please select <strong>File/Import</strong>  in the menu of EasyCID. All the spectra file formats that EasyCID supports as follows:</p>
+<p>To carry out the next modeling process, the spectra file of pure components should be imported into Database firstly. In order to import spectra, please select <strong>Data/add</strong>  in the menu of group. All the spectra file formats that EasyCID supports as follows:</p>
 <blockquote>
 <div><ul class="simple">
 <li><p>B&amp;W Tek spectra files: pure text file which is proposed by B&amp;W Tek Inc. for spectra storage and generated by BWSpec program.</p></li>
@@ -103,12 +102,12 @@
 </ul>
 </div></blockquote>
 <p>After the spectra file load into EasyCID, one can see the names of the spectra in the <strong>Main Window</strong>. The initial name of the corresponding group is similar as the format of “Models1”.</p>
-<a class="reference internal image-reference" href="_images/Add_Group.png"><img alt="_images/Add_Group.png" src="_images/Add_Group.png" style="width: 600px;" /></a>
-<p>Double click on the name of component will plot its Raman spectrum on the bottom right <strong>Plot</strong> Area.</p>
+<a class="reference internal image-reference" href="_images/Add_Group.png"><img alt="_images/Add_Group.png" src="_images/Add_Group.png" style="width: 700px;" /></a>
+<p>Double click on the name of component will plot its Raman spectrum on the right <strong>Plot</strong> Area.</p>
 </section>
 <section id="training-the-cnn-models">
 <span id="id1"></span><h2>Training the CNN models<a class="headerlink" href="#training-the-cnn-models" title="Permalink to this headline"></a></h2>
-<p>To build CNN models for a specific task, one need to adjust the parameters of the modeling process. In order to build CNN models, please select the name of a table or a specific spectrum to be modeled, then click <strong>Train CNN models</strong> in the toobar of EasyCID. The <strong>Parameters Setting Window</strong> will subsequently pop up for adjusting the parameters used in training process.</p>
+<p>To build CNN models for a specific task, one need to adjust the parameters of the modeling process. In order to build CNN models, please select the name of a <em>Group</em> or a <em>spectrum</em>, then click <strong>Function/start</strong> in the menu of training. The <strong>Training Parameters Window</strong> will subsequently pop up for adjusting the parameters used in training process.</p>
 <a class="reference internal image-reference" href="_images/parameters_setting.png"><img alt="_images/parameters_setting.png" src="_images/parameters_setting.png" style="width: 400px;" /></a>
 <p>The description of all adjustable parameters and the corresponding recommend values are shown as follows:</p>
 <table class="docutils align-default">
@@ -175,33 +174,32 @@
 </tr>
 </tbody>
 </table>
-<p>After setting all the parameters, the traning process will take place automatically and an indication of the training progress will appear in the <strong>Main Window</strong>. For better understand the concepts of parameters, please see <a class="reference internal" href="concept.html#hyperparameters-of-cnn-models"><span class="std std-ref">Hyperparameters of CNN models</span></a>.
+<p>After setting all the parameters, the traning process will take place automatically and an progressBar of the training progress will appear in the <strong>Main Window</strong>. For better understand the concepts of parameters, please see <a class="reference internal" href="concept.html#hyperparameters-of-cnn-models"><span class="std std-ref">Hyperparameters of CNN models</span></a>.
 After the training process, a training report will given on <strong>Training Report Window</strong>.</p>
-<a class="reference internal image-reference" href="_images/Training_Report.png"><img alt="_images/Training_Report.png" src="_images/Training_Report.png" style="width: 500px;" /></a>
+<a class="reference internal image-reference" href="_images/Training_Report.png"><img alt="_images/Training_Report.png" src="_images/Training_Report.png" style="width: 700px;" /></a>
 </section>
 <section id="load-models">
 <h2>Load Models<a class="headerlink" href="#load-models" title="Permalink to this headline"></a></h2>
-<p>if you already have a built database, In order to link to this models, please select the group name and click on the right button and then select <strong>Link Models</strong> in the menu.</p>
-<a class="reference internal image-reference" href="_images/Link.png"><img alt="_images/Link.png" src="_images/Link.png" style="width: 300px;" /></a>
-<p>Then, <strong>Link Models Window</strong> will pop up. To successful link to the exist models, it is necessary to select the start, end and interval of the Raman shift corresponding to the models, as well as the storage folder for the models. <em>Note that</em> <strong>If the models is built by EasyCID and the file named ModelsInfo.json is in the storage folder, the start, end and interval of the Raman shift will aotumatically set.</strong></p>
-<a class="reference internal image-reference" href="_images/Load_Models_Window.png"><img alt="_images/Load_Models_Window.png" src="_images/Load_Models_Window.png" style="width: 200px;" /></a>
+<p>if you already have some models trained in EasyCID, in order to load those models, please select the group name and click on <strong>Function/load</strong> in the menu of training.</p>
+<a class="reference internal image-reference" href="_images/Load_Models_Window.png"><img alt="_images/Load_Models_Window.png" src="_images/Load_Models_Window.png" style="width: 300px;" /></a>
+<p>Then, <strong>Link Models Window</strong> will pop up. To successful link to the exist models, it is necessary to select the start, end and interval of the Raman shift corresponding to the models, and the storage folder for the models. <em>Note that</em> <strong>If the models is built by EasyCID and the file named ModelsInfo.json is in the storage folder, the start, end and interval of the Raman shift will aotumatically set.</strong></p>
 </section>
 <section id="perform-analysis">
 <h2>Perform analysis<a class="headerlink" href="#perform-analysis" title="Permalink to this headline"></a></h2>
-<p>To Perform analysis of unknown samples is simple in EasyCID. Since the CNN models have already been build in previous steps, it takes the next two steps:
-Firstly, load spectra of samples for prediction by selecting the menu item <strong>File/Open</strong>, and select the spectra to be analyzed.</p>
-<a class="reference internal image-reference" href="_images/Add_Mixtures.png"><img alt="_images/Add_Mixtures.png" src="_images/Add_Mixtures.png" style="width: 600px;" /></a>
-<p>Double click on the name of mixture will plot its Raman spectrum on the bottom right <strong>Plot</strong> Area.</p>
-<p>Next, Clicking <strong>Prediction</strong> in the toolbar and then select the corrspound group and threshold in the pop-up <strong>Prediction Window</strong>.</p>
+<p>To Perform analysis of unknown samples is simple in EasyCID. Since the CNN models have already been build in previous steps, it only takes the next two steps:
+Firstly, load spectra of samples for prediction by selecting the menu item <strong>Function/open</strong> in prediction, and select the spectra to be analyzed.</p>
+<a class="reference internal image-reference" href="_images/Add_Mixtures.png"><img alt="_images/Add_Mixtures.png" src="_images/Add_Mixtures.png" style="width: 700px;" /></a>
+<p>Double click on the name of mixture will plot its Raman spectrum on the right <strong>Plot</strong> Area.</p>
+<p>Next, Clicking <strong>Function/start</strong> in the menu of prediction and then select the corrspound group and threshold in the pop-up <strong>Prediction Window</strong>.</p>
 <a class="reference internal image-reference" href="_images/prediction.png"><img alt="_images/prediction.png" src="_images/prediction.png" style="width: 300px;" /></a>
 <p>After prediction, the results will shown in <strong>Main Window</strong>.</p>
-<a class="reference internal image-reference" href="_images/Prediction_Results.png"><img alt="_images/Prediction_Results.png" src="_images/Prediction_Results.png" style="width: 600px;" /></a>
-<p>Check the checkbox can</p>
+<a class="reference internal image-reference" href="_images/Prediction_Results.png"><img alt="_images/Prediction_Results.png" src="_images/Prediction_Results.png" style="width: 700px;" /></a>
+<p>Check the checkbox can plot the Raman spectra of the mixture and the corresponding components on the right <strong>Plot</strong> Area.</p>
 </section>
-<section id="quantitative-analysis">
-<span id="id2"></span><h2>Quantitative Analysis<a class="headerlink" href="#quantitative-analysis" title="Permalink to this headline"></a></h2>
-<p>After obtaining the prediction results, the user can choose to perform further quantitative analysis process. In order to perform quantitative analysis process, please select <strong>Quantitative analysis</strong> in the toolbar. Then <strong>Ratio Estimation Window</strong> will pop up for adjusting the parameters of the used methods.</p>
-<a class="reference internal image-reference" href="_images/qa_setting.png"><img alt="_images/qa_setting.png" src="_images/qa_setting.png" style="width: 300px;" /></a>
+<section id="ratio-estimation">
+<span id="id2"></span><h2>Ratio Estimation<a class="headerlink" href="#ratio-estimation" title="Permalink to this headline"></a></h2>
+<p>After obtaining the prediction results, the user can choose to perform further ratio estimation process. In order to perform ratio estimation process, please select <strong>Function/ratio</strong> in the menu of prediction. Then <strong>Ratio Estimation Window</strong> will pop up for adjusting the parameters of the used methods.</p>
+<a class="reference internal image-reference" href="_images/Ratio_Estimation_Setting.png"><img alt="_images/Ratio_Estimation_Setting.png" src="_images/Ratio_Estimation_Setting.png" style="width: 300px;" /></a>
 <p>The description of all adjustable parameters and the corresponding recommend values are shown as follows:</p>
 <table class="docutils align-default">
 <colgroup>
@@ -249,11 +247,11 @@ Elastic net</p></td>
 </tbody>
 </table>
 <p>After setting all the parameters, the ratio estimation process will take place automatically and the ratio of each components will be shown in the <strong>Main Window</strong> at the end of the process. For better understand the concepts of parameters, please see <a class="reference internal" href="concept.html#basic-concepts"><span class="std std-ref">Basic Concepts</span></a>.</p>
-<a class="reference internal image-reference" href="_images/Ratio_Estimation_Results.png"><img alt="_images/Ratio_Estimation_Results.png" src="_images/Ratio_Estimation_Results.png" style="width: 600px;" /></a>
+<a class="reference internal image-reference" href="_images/Ratio_Estimation_Results.png"><img alt="_images/Ratio_Estimation_Results.png" src="_images/Ratio_Estimation_Results.png" style="width: 700px;" /></a>
 </section>
 <section id="save-results">
 <h2>Save Results<a class="headerlink" href="#save-results" title="Permalink to this headline"></a></h2>
-<p>You could save the prediction results and the corresponding ratios in EXCEL format. To save them, please select <strong>File/Save as</strong> of the main menu.</p>
+<p>You could save the prediction results and the corresponding ratios in CSV format. To save them, please select <strong>Function/Save</strong> in prediction.</p>
 </section>
 </section>
 

@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Basic Concepts &mdash; DeepCID_GUI Documentation 1.0 documentation</title>
+  <title>Basic Concepts &mdash; EasyCID Documentation 1.0 documentation</title>
       <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -18,7 +18,6 @@
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Menu &amp; Toolbar" href="menu_toolbar.html" />
     <link rel="prev" title="Quickly Start EasyCID" href="start.html" /> 
 </head>
 
@@ -27,7 +26,7 @@
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-            <a href="index.html" class="icon icon-home"> DeepCID_GUI Documentation
+            <a href="index.html" class="icon icon-home"> EasyCID Documentation
           </a>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
@@ -51,7 +50,6 @@
 <li class="toctree-l2"><a class="reference internal" href="#regression-analysis">Regression Analysis</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="menu_toolbar.html">Menu &amp; Toolbar</a></li>
 </ul>
 
         </div>
@@ -60,7 +58,7 @@
 
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="index.html">DeepCID_GUI Documentation</a>
+          <a href="index.html">EasyCID Documentation</a>
       </nav>
 
       <div class="wy-nav-content">
@@ -82,8 +80,8 @@
 <section id="database">
 <h2>Database<a class="headerlink" href="#database" title="Permalink to this headline"></a></h2>
 <p>The Raman spectra are stored in the SQLite database for better scaling, productivity and easy maintenance. The schema of the SQLite database is shown as follows:</p>
-<a class="reference internal image-reference" href="_images/schema.png"><img alt="_images/schema.png" src="_images/schema.png" style="width: 300px;" /></a>
-<p>EasyCID can extract the spectral information from raw Raman spectra in SPC, JCAMP-DX and TXT formats. Then, the extracted information, such intensity and Raman shift, is inserted into the database. These information can be retrieved from the database for data augmentation, training and prediction.</p>
+<a class="reference internal image-reference" href="_images/schema.png"><img alt="_images/schema.png" src="_images/schema.png" style="width: 700px;" /></a>
+<p>EasyCID can extract the spectral information from raw Raman spectra in SPC, JCAMP-DX and TXT formats. Then, the extracted information, such intensity and Raman shift, is inserted into the database. Those Raman spectra are divided into groups for specific tasks. The database can also records the training information of the CNN model, which facilitates the tuning of the models. These information can be retrieved from the database for data augmentation, training and prediction.</p>
 </section>
 <section id="data-augmentation">
 <h2>Data Augmentation<a class="headerlink" href="#data-augmentation" title="Permalink to this headline"></a></h2>
@@ -92,7 +90,7 @@
 <section id="cnn-models">
 <h2>CNN models<a class="headerlink" href="#cnn-models" title="Permalink to this headline"></a></h2>
 <p>CNN can extract the features of the spectra and learn to identify components of unknown spectra of mixtures.</p>
-<a class="reference internal image-reference" href="_images/CNN.png"><img alt="_images/CNN.png" src="_images/CNN.png" style="width: 600px;" /></a>
+<a class="reference internal image-reference" href="_images/CNN.png"><img alt="_images/CNN.png" src="_images/CNN.png" style="width: 700px;" /></a>
 <p>one-dimensional CNN with six hidden layers is used. The convolution layers are used to extract the features of spectra, which consists of a one-dimensional convolution, batch normalization and rectify linear unit (ReLU) function. Each convolution layer is followed by a pooling layer, which eliminates noisy information and reduce the amount of data. The fully connected layer are used as a classifier to determine the existence of the component based on the extracted features, where ReLU is used as the activation function in first layer while Sigmoid is used in second layer. Between two fully connected layers, Dropout is used to increase the generalization ability of the model. Binary cross entropy is used as the loss function.</p>
 </section>
 <section id="hyperparameters-of-cnn-models">
@@ -116,14 +114,17 @@
 <section id="baseline-subtracted">
 <h2>Baseline Subtracted<a class="headerlink" href="#baseline-subtracted" title="Permalink to this headline"></a></h2>
 <p>Adaptive iteratively reweighted penalized least squares (airPLS) is used as the baseline subtracted method that works by iteratively changing weights of sum squares errors between the fitted baseline and original signals.</p>
+<p>The details for airPLS can be seen at <a class="reference external" href="https://doi.org/10.1039/B922045C">Baseline correction using adaptive iteratively reweighted penalized least squares</a></p>
 </section>
 <section id="spectral-smoothing">
 <h2>Spectral Smoothing<a class="headerlink" href="#spectral-smoothing" title="Permalink to this headline"></a></h2>
 <p>Whittaker smoother is a spectral smoothing method that based on penalized least squares, which obtains smoothed data by adjusting the weight between the fidelity and roughness of data.</p>
+<p>The details for Whittaker smoother can be seen at <a class="reference external" href="https://doi.org/10.1021/ac034173t">A Perfect Smoother</a></p>
 </section>
 <section id="regression-analysis">
 <h2>Regression Analysis<a class="headerlink" href="#regression-analysis" title="Permalink to this headline"></a></h2>
-<p>Elastic net is used to determine the proportion of each pure component in the mixture. The method can be treated as a hybrid of lasso and ridge regression, which combines both the L1 and L2 regularization to improve the regularization of statistical models. The details for elastic net used in EasyCID can be seen at <a class="reference external" href="https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.ElasticNet.html">sklearn.linear_model.ElasticNet</a></p>
+<p>Non-negative elastic net is used to determine the relative ratio of each pure component in the mixture. The method can be treated as a hybrid of lasso[37] and ridge regression, which combines both the L1 and L2 regularization to improve the regularization of statistical models. Considering the concentration of the compound should be non-negative, the non-negative restrictions is imposed to make the results more reasonable.</p>
+<p>The details for Non-negative elastic net can be seen at <a class="reference external" href="https://doi.org/10.1002/cem.3293">Mixture analysis using non-negative elastic net for Raman spectroscopy</a></p>
 </section>
 </section>
 
@@ -132,7 +133,6 @@
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="start.html" class="btn btn-neutral float-left" title="Quickly Start EasyCID" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="menu_toolbar.html" class="btn btn-neutral float-right" title="Menu &amp; Toolbar" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

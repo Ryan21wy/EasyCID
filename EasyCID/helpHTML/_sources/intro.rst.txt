@@ -8,5 +8,3 @@ This documentation gives an detail introduction to EasyCID program, which descri
 	* Quickly use EasyCID for modeling and analysis
 
 	* Some Basic Concepts
-
-	* Menu and Toolbar
