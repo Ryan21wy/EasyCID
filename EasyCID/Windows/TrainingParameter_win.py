@@ -157,7 +157,7 @@ class Ui_Dialog(object):
 
     def retranslateUi(self, Dialog):
         _translate = QtCore.QCoreApplication.translate
-        Dialog.setWindowTitle(_translate("Dialog", "Parameter"))
+        Dialog.setWindowTitle(_translate("Dialog", "Training Setting"))
         self.groupBox.setTitle(_translate("Dialog", "Training"))
         self.optimizer_.setItemText(0, _translate("Dialog", "Adam"))
         self.optimizer_.setItemText(1, _translate("Dialog", "Adadelta"))

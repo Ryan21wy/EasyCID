@@ -76,6 +76,6 @@ class Ui_Dialog(object):
 
     def retranslateUi(self, Dialog):
         _translate = QtCore.QCoreApplication.translate
-        Dialog.setWindowTitle(_translate("Dialog", "Train History"))
+        Dialog.setWindowTitle(_translate("Dialog", "Training Report"))
         self.groupBox.setTitle(_translate("Dialog", "Loss-Acc-Curve"))
         self.pushButton.setText(_translate("Dialog", "OK"))

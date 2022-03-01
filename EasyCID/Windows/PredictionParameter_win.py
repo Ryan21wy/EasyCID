@@ -39,7 +39,7 @@ class Ui_dialog(object):
 
     def retranslateUi(self, dialog):
         _translate = QtCore.QCoreApplication.translate
-        dialog.setWindowTitle(_translate("dialog", "Prediction"))
+        dialog.setWindowTitle(_translate("dialog", "Prediction Setting"))
         self.OK.setText(_translate("dialog", "OK"))
         self.label.setText(_translate("dialog", "Model Selection:"))
         self.label_2.setText(_translate("dialog", "Threshold："))
