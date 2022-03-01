@@ -26,7 +26,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
 # from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtWidgets import QApplication, QMainWindow, QGridLayout, QAbstractItemView, \
-    QFileDialog, QDialog, QMessageBox, QTreeWidgetItem, QMenu, QHeaderView, QSizePolicy, QPushButton
+    QFileDialog, QDialog, QMessageBox, QTreeWidgetItem, QHeaderView, QSizePolicy
 from PyQt5.QtCore import Qt, QThread, QStringListModel, pyqtSignal, QTimer
 from PyQt5.QtGui import QIcon, QStandardItemModel, QStandardItem, QFont
 from matplotlib.figure import Figure
@@ -1808,7 +1808,6 @@ class AppWindow(QMainWindow, Ui_MainWindow):
     def closeEvent(self, event):
         reply = MessageDisplay.question(self, "Confirm Exit", "Are you sure you want to exit EasyCID?",
                                         "Exit", "Cancel")
-        print(reply)
         if reply == "Exit":
             global path_config
             info_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'PathConfig.json')
