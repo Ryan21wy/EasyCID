@@ -32,7 +32,7 @@ Install Package: [EasyCID-1.0-Windows.exe]()
 
 ## Usage
 
-For the details on how to use EasyCID, please check [PDF ducomentation](). 
+For the details on how to use EasyCID, please check [PDF ducomentation](https://github.com/Ryan21wy/EasyCID/blob/master/Documentation.pdf). 
 
 The html ducomentation and a demo are provided in the GUI of EasyCID.
 
