@@ -499,8 +499,12 @@ class TrainingRun(QThread):
                 para_record = []
                 if self.aug_save_path:
                     mkdir(self.aug_save_path)
-                    aug_data_path = os.path.join(self.aug_save_path, self.names[com] + '.npy')
-                    aug_label_path = os.path.join(self.aug_save_path, self.names[com] + '_label.npy')
+                    axis_s = self.new_axis[0]
+                    axis_e = self.new_axis[-1]
+                    axis_itv = self.new_axis[1] - self.new_axis[0]
+                    axis_info = str(axis_s) + '_' + str(axis_e) + '_' + str(axis_itv)
+                    aug_data_path = os.path.join(self.aug_save_path, self.names[com] + '_' + axis_info + '.npy')
+                    aug_label_path = os.path.join(self.aug_save_path, self.names[com] + '_' + axis_info + '_label.npy')
                     if os.path.isfile(aug_data_path):
                         spectrum = np.load(aug_data_path)
                         label = np.load(aug_label_path)
@@ -1781,6 +1785,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         if m == 'run':
             self.textBrowser_3.setText('Download the demo of EasyCID')
             self.progressBar.setTextVisible(True)
+            self.progressBar.setFormat('%p%')
             self.train_run.setEnabled(False)
             self.load_model.setEnabled(False)
         elif m == 'finish':
