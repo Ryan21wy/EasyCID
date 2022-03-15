@@ -3,7 +3,7 @@ import pandas as pd
 
 def make_csv(mixtures, components, save_path, ratios=None):
     data = []
-    if ratios:
+    if any(ratios):
         for i in range(len(mixtures)):
             mix = mixtures[i]
             for j in range(len(components[mix])):

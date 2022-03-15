@@ -611,17 +611,17 @@ class RatioEstimationRun(QThread):
         self.parameters = parameters
 
     def run(self):
-        try:
-            self.signal.emit('run')
-            sb_param = self.parameters['sb']
-            sm_param = self.parameters['sm']
-            en_param = self.parameters['en']
-            ratios = []
-            k = 0
-            self.max_bar.emit(len(self.mix))
-            self.current_bar.emit(k)
-            for m in self.mix:
-                com_spectra = self.com[k]
+        self.signal.emit('run')
+        sb_param = self.parameters['sb']
+        sm_param = self.parameters['sm']
+        en_param = self.parameters['en']
+        ratios = []
+        k = 0
+        self.max_bar.emit(len(self.mix))
+        self.current_bar.emit(k)
+        for m in self.mix:
+            com_spectra = self.com[k]
+            try:
                 if sm_param is not None:
                     for i in range(com_spectra.shape[0]):
                         com_spectra[i] = WhittakerSmooth(com_spectra[i], np.ones(com_spectra[i].shape[0]),
@@ -636,13 +636,13 @@ class RatioEstimationRun(QThread):
                 ratio = ratio / sum(ratio)
                 ratio[-1] = 1 - sum(ratio[:-1])
                 ratio = np.round(ratio, 3)
-                ratios.append(ratio)
-                k += 1
-                self.current_bar.emit(k)
-            self.rate_signal.emit(ratios)
-            self.signal.emit('finished')
-        except Exception as err:
-            self.signal.emit(str(err))
+                ratios.append(list(ratio))
+            except:
+                ratios.append([])
+            k += 1
+            self.current_bar.emit(k)
+        self.rate_signal.emit(ratios)
+        self.signal.emit('finished')
 
 
 class CSVCreate(QThread):
@@ -852,11 +852,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.threshold = 0.5
         self.pred_names = []
         self.pred_data = []
-        self.pred_param = {}
-        self.data_name = []
-        self.c_data_list = []
         self.candidate_model = []
-        self.raman_shift_para = []
         self.train_com_name = []
         self.train_com_spec = []
         self.train_para = {}
@@ -864,6 +860,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.muti = False
         self.pred_on = False
         self.train_on = False
+        self.first_train = True
         self.RE_on = False
         self.model_path = ''
         self.data_path = ''
@@ -1390,10 +1387,6 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.ComponentMI = [m[7], m[8], m[3], m[4], m[5], m[6]]
         self.model_path = m[-1]
         self.t_new_axis = np.linspace(m[0], m[1], int((m[1] - m[0]) / m[2] + 1))
-        model_info = {'start': m[0], 'end': m[1], 'interval': m[2]}
-        info_path = os.path.join(self.model_path, 'ModelsInfo.json')
-        with open(info_path, 'w') as fp:
-            json.dump(model_info, fp)
         AppWindow.training_strat(self, m[3:], self.train_index, self.t_axis, self.t_new_axis)
 
     def training_strat(self, sp, count, axis, new_axis):
@@ -1422,6 +1415,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         if m == 'run':
             self.progressBar.setTextVisible(True)
             self.train_on = True
+            self.first_train = True
             self.train_para = {}
         elif m == 'finished':
             self.progressBar.setValue(0)
@@ -1461,15 +1455,21 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         name = m[0]
         group_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (group,))[0][0]
         self.EasyDB.update('Component_Info', 'Model=?', 'Component_Name=? and From_Group=?', (1, name, group_id))
-        GroupMI = self.GroupMI.copy()
-        GroupMI.append(group_id)
-        jug = self.EasyDB.select('*', 'Group_Model_Info', 'From_Group=?', (group_id,))
-        if jug:
-            self.EasyDB.update('Group_Model_Info',
-                               'Raman_Start=?, Raman_End=?, Raman_Interval=?, Aug_Save_Path=?, Save_Path=?',
-                               'From_Group=?', tuple(GroupMI))
-        else:
-            self.EasyDB.insert('Group_Model_Info', '(?,?,?,?,?,?)', GroupMI)
+        if self.first_train:
+            GroupMI = self.GroupMI.copy()
+            GroupMI.append(group_id)
+            jug = self.EasyDB.select('*', 'Group_Model_Info', 'From_Group=?', (group_id,))
+            if jug:
+                self.EasyDB.update('Group_Model_Info',
+                                   'Raman_Start=?, Raman_End=?, Raman_Interval=?, Aug_Save_Path=?, Save_Path=?',
+                                   'From_Group=?', tuple(GroupMI))
+            else:
+                self.EasyDB.insert('Group_Model_Info', '(?,?,?,?,?,?)', GroupMI)
+            model_info = {'start': GroupMI[0], 'end': GroupMI[1], 'interval': GroupMI[2]}
+            info_path = os.path.join(self.model_path, 'ModelsInfo.json')
+            with open(info_path, 'w') as fp:
+                json.dump(model_info, fp)
+            self.first_train = False
         component_id = self.EasyDB.select('Component_ID ', 'Component_Info', 'Component_Name=?', (name,))[0][0]
         ComponentMI = self.ComponentMI.copy()
         ComponentMI.append(component_id)
@@ -1664,6 +1664,8 @@ class AppWindow(QMainWindow, Ui_MainWindow):
 
     def ratios_display(self, ratios):
         self.ratios = ratios
+        if not any(ratios):
+            return
         self.predict_result.clear()
         self.main_root = QTreeWidgetItem(self.predict_result)
         self.main_root.setText(0, 'Prediction results')
