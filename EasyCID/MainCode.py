@@ -8,8 +8,6 @@ import tensorflow as tf
 if hasattr(sys, 'frozen'):
     os.environ['PATH'] = sys._MEIPASS + ";" + os.environ['PATH']
 os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices'
-config = tf.compat.v1.ConfigProto(gpu_options=tf.compat.v1.GPUOptions(allow_growth=True))
-sess = tf.compat.v1.Session(config=config)
 
 import webbrowser
 import sqlite3
@@ -1399,17 +1397,17 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         aug_para = sp[4:7]
         info_para = [self.train_com_name, count, self.train_com_spec, axis, new_axis]
 
-        self.thread = TrainingRun(train_para, aug_para, info_para)
-        self.thread.signal.connect(self.get_train_thread_signal)
-        self.thread.process_signal.connect(self.get_train_process_signal)
-        self.thread.max_bar.connect(self.get_max_bar_value)
-        self.thread.current_bar.connect(self.get_current_bar_value)
-        self.thread.bar_text.connect(self.get_bar_text)
-        self.thread.err_signal.connect(self.get_train_err_signal)
-        self.thread.data_signal.connect(self.get_train_data_signal)
-        self.thread.para_signal.connect(self.get_train_para_signal)
-        self.thread.daemon = True
-        self.thread.start()
+        self.thread_t = TrainingRun(train_para, aug_para, info_para)
+        self.thread_t.signal.connect(self.get_train_thread_signal)
+        self.thread_t.process_signal.connect(self.get_train_process_signal)
+        self.thread_t.max_bar.connect(self.get_max_bar_value)
+        self.thread_t.current_bar.connect(self.get_current_bar_value)
+        self.thread_t.bar_text.connect(self.get_bar_text)
+        self.thread_t.err_signal.connect(self.get_train_err_signal)
+        self.thread_t.data_signal.connect(self.get_train_data_signal)
+        self.thread_t.para_signal.connect(self.get_train_para_signal)
+        self.thread_t.daemon = True
+        self.thread_t.start()
 
     def get_train_thread_signal(self, m):
         if m == 'run':
@@ -1551,13 +1549,13 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         if self.pred_data is None:
             MessageDisplay.information(self, "Information", 'Missing spectra to be analyzed')
             return
-        self.thread_2 = PredictionRun(self.pred_data, model_path_list)
-        self.thread_2.signal.connect(self.get_pred_thread_signal)
-        self.thread_2.current_bar.connect(self.get_current_bar_value2)
-        self.thread_2.max_bar.connect(self.get_max_bar_value2)
-        self.thread_2.data_signal.connect(self.get_pred_data_signal)
-        self.thread_2.daemon = True
-        self.thread_2.start()
+        self.thread_p = PredictionRun(self.pred_data, model_path_list)
+        self.thread_p.signal.connect(self.get_pred_thread_signal)
+        self.thread_p.current_bar.connect(self.get_current_bar_value2)
+        self.thread_p.max_bar.connect(self.get_max_bar_value2)
+        self.thread_p.data_signal.connect(self.get_pred_data_signal)
+        self.thread_p.daemon = True
+        self.thread_p.start()
 
     def get_max_bar_value2(self, m):
         self.progressBar_2.setMaximum(m)
@@ -1654,13 +1652,13 @@ class AppWindow(QMainWindow, Ui_MainWindow):
             mix.append(mixture)
             com.append(spectra_raw)
             i += 1
-        self.thread_3 = RatioEstimationRun(mix, com, m)
-        self.thread_3.signal.connect(self.get_pred_thread_signal)
-        self.thread_3.rate_signal.connect(self.ratios_display)
-        self.thread_3.current_bar.connect(self.get_current_bar_value2)
-        self.thread_3.max_bar.connect(self.get_max_bar_value2)
-        self.thread_3.daemon = True
-        self.thread_3.start()
+        self.thread_r = RatioEstimationRun(mix, com, m)
+        self.thread_r.signal.connect(self.get_pred_thread_signal)
+        self.thread_r.rate_signal.connect(self.ratios_display)
+        self.thread_r.current_bar.connect(self.get_current_bar_value2)
+        self.thread_r.max_bar.connect(self.get_max_bar_value2)
+        self.thread_r.daemon = True
+        self.thread_r.start()
 
     def ratios_display(self, ratios):
         self.ratios = ratios
@@ -1743,10 +1741,10 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         if not save_path:
             return
         path_config['OpenFiles'] = os.path.dirname(save_path)
-        self.thread_s = CSVCreate(self.pred_names, self.result_list, self.ratios, save_path)
-        self.thread_s.signal.connect(self.get_save_thread_signal)
-        self.thread_s.daemon = True
-        self.thread_s.start()
+        self.thread_c = CSVCreate(self.pred_names, self.result_list, self.ratios, save_path)
+        self.thread_c.signal.connect(self.get_save_thread_signal)
+        self.thread_c.daemon = True
+        self.thread_c.start()
 
     def get_save_thread_signal(self, m):
         if m == 'run':
@@ -1775,12 +1773,12 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         if reply == "No":
             return
         elif reply == "Continue":
-            self.thread = DownloadDemo()
-            self.thread.signal.connect(self.get_demo_thread_signal)
-            self.thread.current_bar.connect(self.get_current_bar_value)
-            self.thread.max_bar.connect(self.get_max_bar_value)
-            self.thread.daemon = True
-            self.thread.start()
+            self.thread_d = DownloadDemo()
+            self.thread_d.signal.connect(self.get_demo_thread_signal)
+            self.thread_d.current_bar.connect(self.get_current_bar_value)
+            self.thread_d.max_bar.connect(self.get_max_bar_value)
+            self.thread_d.daemon = True
+            self.thread_d.start()
         return
 
     def get_demo_thread_signal(self, m):
