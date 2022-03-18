@@ -36,6 +36,8 @@ Install Package: [EasyCID-1.0.0-Windows.exe](https://github.com/Ryan21wy/EasyCID
 
 For the details on how to use EasyCID, please check [PDF ducomentation](https://github.com/Ryan21wy/EasyCID/blob/master/Documentation.pdf). 
 
+The video for using the EasyCID is available at the [video folder](https://github.com/Ryan21wy/EasyCID/blob/master/Videos).
+
 The html ducomentation and a demo are provided in the EasyCID GUI.
 
 ## Contact
