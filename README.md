@@ -33,10 +33,26 @@ Install Package: [EasyCID-1.0.0-Windows.exe](https://github.com/Ryan21wy/EasyCID
         python MainCode.py
 
 ## Usage
+1. Build Database & Import Data
+
+https://user-images.githubusercontent.com/81405754/162189284-d9d3ba02-4e93-4a90-8b55-c9d8c7bdd58f.mov
+
+
+2. Training CNN Models
+
+https://user-images.githubusercontent.com/81405754/162186979-dc25a0f6-e675-417c-81b5-2f57c3b6d533.mov
+
+3. Prediction
+
+https://user-images.githubusercontent.com/81405754/162192498-dcc52b6c-6c55-4079-a909-b861b96b67a2.mov
+
+4. Save Results
+
+https://user-images.githubusercontent.com/81405754/162192883-2ba04376-5e7a-4d66-8ec7-f2f52194e464.mov
+
+The Full video for using the EasyCID is available at the [video folder](https://github.com/Ryan21wy/EasyCID/blob/master/Videos).
 
 For the details on how to use EasyCID, please check [PDF ducomentation](https://github.com/Ryan21wy/EasyCID/blob/master/Documentation.pdf). 
-
-The video for using the EasyCID is available at the [video folder](https://github.com/Ryan21wy/EasyCID/blob/master/Videos).
 
 The html ducomentation and a demo are provided in the EasyCID GUI.
 
