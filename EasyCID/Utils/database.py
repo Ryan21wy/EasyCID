@@ -19,9 +19,9 @@ class EasyCIDDatabase:
               'Aug_Save_Path VARCHAR, Save_Path VARCHAR, From_Group INTEGER, foreign key(From_Group) references ' \
               'Groups(Group_ID) on delete cascade on update cascade) '
         self.cur.execute(sql)
-        sql = 'CREATE TABLE Component_Model_Info (Augment_Num INTEGER, Noise_Rate FLOAT, Optimizer INTEGER, ' \
-              'LR FLOAT, BS INTEGER, EPS INTEGER, From_Component INTEGER, foreign key(From_Component) references ' \
-              'Component_Info(Component_ID) on delete cascade on update cascade) '
+        sql = 'CREATE TABLE Component_Model_Info (Augment_Num INTEGER, Max_Components INTEGER, Noise_Rate FLOAT, ' \
+              'Optimizer INTEGER, LR FLOAT, BS INTEGER, EPS INTEGER, From_Component INTEGER, ' \
+              'foreign key(From_Component) references Component_Info(Component_ID) on delete cascade on update cascade)'
         self.cur.execute(sql)
         self.db.commit()
 

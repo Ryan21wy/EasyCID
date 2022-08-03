@@ -86,7 +86,7 @@ class MessageDisplay:
 class TrainingParameterSetting(QDialog):
     signal_parp = pyqtSignal(list)
 
-    def __init__(self, GroupMI=None, ComponentMI=None, fixed=False):
+    def __init__(self, GroupMI=None, ComponentMI=None, fixed=False, num_com=10):
         QDialog.__init__(self)
         self.child = TrainingParameter_win.Ui_Dialog()
         self.child.setupUi(self)
@@ -98,6 +98,7 @@ class TrainingParameterSetting(QDialog):
         self.child.save_.clicked.connect(self.signal_emit)
         self.child.cancel_.clicked.connect(self.cancel)
         self.child.save_.setEnabled(True)
+        self.child.num_components.setMaximum(num_com - 1)
         self.signal = []
         if GroupMI:
             self.child.startshift.setValue(GroupMI[0])
@@ -107,15 +108,16 @@ class TrainingParameterSetting(QDialog):
             self.child.savepath.setText(GroupMI[4])
         if ComponentMI:
             self.child.number.setValue(ComponentMI[0])
-            nr1, nr2 = self.extract_num(ComponentMI[1])
+            self.child.num_components.setValue(ComponentMI[1])
+            nr1, nr2 = self.extract_num(ComponentMI[2])
             self.child.noise1.setValue(nr1)
             self.child.noise2.setValue(nr2)
-            self.child.optimizer_.setCurrentIndex(ComponentMI[2])
-            lr1, lr2 = self.extract_num(ComponentMI[3])
+            self.child.optimizer_.setCurrentIndex(ComponentMI[3])
+            lr1, lr2 = self.extract_num(ComponentMI[4])
             self.child.lr1.setValue(lr1)
             self.child.lr2.setValue(lr2)
-            self.child.batchsize.setValue(ComponentMI[4])
-            self.child.epochs_.setValue(ComponentMI[5])
+            self.child.batchsize.setValue(ComponentMI[5])
+            self.child.epochs_.setValue(ComponentMI[6])
         if fixed:
             self.child.startshift.setEnabled(False)
             self.child.endshift.setEnabled(False)
@@ -177,6 +179,7 @@ class TrainingParameterSetting(QDialog):
         self.signal.append(self.child.batchsize.value())
         self.signal.append(self.child.epochs_.value())
         self.signal.append(self.child.number.value())
+        self.signal.append(self.child.num_components.value())
         nr1 = self.child.noise1.value()
         nr2 = self.child.noise2.value()
         nr = nr1 * 10 ** (-nr2)
@@ -466,8 +469,9 @@ class TrainingRun(QThread):
         self.epochs = train_para[2]
         self.model_path = train_para[3]
         self.aug_number = aug_para[0]
-        self.noise_rate = aug_para[1]
-        self.aug_save_path = aug_para[2]
+        self.max_components = aug_para[1]
+        self.noise_rate = aug_para[2]
+        self.aug_save_path = aug_para[3]
         self.names = info_para[0]
         self.count = info_para[1]
         self.spectra = info_para[2]
@@ -475,7 +479,7 @@ class TrainingRun(QThread):
         self.new_axis = info_para[4]
 
     def run(self):
-        try:
+        # try:
             self.signal.emit('run')
             Spectrumdata = np.zeros((1, self.new_axis.shape[0]))
             count = len(self.spectra)
@@ -507,11 +511,13 @@ class TrainingRun(QThread):
                         spectrum = np.load(aug_data_path)
                         label = np.load(aug_label_path)
                     else:
-                        spectrum, label = data_augment(spectra_raw, com, num=self.aug_number, nr=self.noise_rate)
+                        spectrum, label = data_augment(spectra_raw, com, num=self.aug_number, nr=self.noise_rate,
+                                                       max_num_com=self.max_components)
                         np.save(aug_data_path, spectrum)
                         np.save(aug_label_path, label)
                 else:
-                    spectrum, label = data_augment(spectra_raw, com, num=self.aug_number, nr=self.noise_rate)
+                    spectrum, label = data_augment(spectra_raw, com, num=self.aug_number, nr=self.noise_rate,
+                                                   max_num_com=self.max_components)
                 Xtrain, Xtest, Ytrain, Ytest = spilt_dataset(spectrum, label)
                 tf.keras.backend.clear_session()
                 ops.reset_default_graph()
@@ -551,8 +557,8 @@ class TrainingRun(QThread):
                 self.bar_text.emit('%s/%s' % (current_com, total_com))
                 self.process_signal.emit('Training Active [%s<%s] %ss/it' % (cost_t, remain_t, average_t))
             self.signal.emit('finished')
-        except Exception as err:
-            self.err_signal.emit(str(err))
+        # except Exception as err:
+        #     self.err_signal.emit(str(err))
 
 
 class PredictionRun(QThread):
@@ -1374,15 +1380,16 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.create_models(GroupMI=GroupMI, ComponentMI=ComponentMI, fixed=fixed)
 
     def create_models(self, GroupMI=None, ComponentMI=None, fixed=False):
-        childwin = TrainingParameterSetting(GroupMI=GroupMI, ComponentMI=ComponentMI, fixed=fixed)
+        childwin = TrainingParameterSetting(GroupMI=GroupMI, ComponentMI=ComponentMI, fixed=fixed,
+                                            num_com=len(self.train_com_spec))
         childwin.move(self.geometry().x() + (self.geometry().width() - childwin.width()) // 2,
                       self.geometry().y() + (self.geometry().height() - childwin.height()) // 2)
         childwin.signal_parp.connect(self.get_train_signal)
         childwin.exec_()
 
     def get_train_signal(self, m):
-        self.GroupMI = [m[0], m[1], m[2], m[9], m[10]]
-        self.ComponentMI = [m[7], m[8], m[3], m[4], m[5], m[6]]
+        self.GroupMI = [m[0], m[1], m[2], m[10], m[11]]
+        self.ComponentMI = [m[7], m[8], m[9], m[3], m[4], m[5], m[6]]
         self.model_path = m[-1]
         self.t_new_axis = np.linspace(m[0], m[1], int((m[1] - m[0]) / m[2] + 1))
         AppWindow.training_strat(self, m[3:], self.train_index, self.t_axis, self.t_new_axis)
@@ -1394,7 +1401,7 @@ class AppWindow(QMainWindow, Ui_MainWindow):
                           tf.keras.optimizers.Adamax(learning_rate=sp[1])]
         optimizer = optimizer_list[sp[0]]
         train_para = [optimizer, sp[2], sp[3], sp[-1]]
-        aug_para = sp[4:7]
+        aug_para = sp[4:8]
         info_para = [self.train_com_name, count, self.train_com_spec, axis, new_axis]
 
         self.thread_t = TrainingRun(train_para, aug_para, info_para)
@@ -1473,10 +1480,10 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         ComponentMI.append(component_id)
         jug = self.EasyDB.select('*', 'Component_Model_Info', 'From_Component=?', (component_id,))
         if jug:
-            self.EasyDB.update('Component_Model_Info', 'Augment_Num=?, Noise_Rate=?, Optimizer=?, LR=?, BS=?, EPS=?',
-                               'From_Component=?', tuple(ComponentMI))
+            self.EasyDB.update('Component_Model_Info', 'Augment_Num=?, Max_Components=?, Noise_Rate=?, Optimizer=?, '
+                                                       'LR=?, BS=?, EPS=?', 'From_Component=?', tuple(ComponentMI))
         else:
-            self.EasyDB.insert('Component_Model_Info', '(?,?,?,?,?,?,?)', ComponentMI)
+            self.EasyDB.insert('Component_Model_Info', '(?,?,?,?,?,?,?,?)', ComponentMI)
         self.train_group_widget.child(self.train_com_name.index(name)).setText(1, self.model_ref[1])
 
     def get_train_para_signal(self, m):
