@@ -108,7 +108,7 @@
 <section id="training-the-cnn-models">
 <span id="id1"></span><h2>Training the CNN models<a class="headerlink" href="#training-the-cnn-models" title="Permalink to this headline"></a></h2>
 <p>To build CNN models for a specific task, one need to adjust the parameters of the modeling process. In order to build CNN models, please select the name of a <em>Group</em> or a <em>spectrum</em>, then click <strong>Function/start</strong> in the menu of training. The <strong>Training Parameters Window</strong> will subsequently pop up for adjusting the parameters used in training process.</p>
-<a class="reference internal image-reference" href="_images/parameters_setting.png"><img alt="_images/parameters_setting.png" src="_images/parameters_setting.png" style="width: 400px;" /></a>
+<a class="reference internal image-reference" href="_images/parameters_setting_new.png"><img alt="_images/parameters_setting_new.png" src="_images/parameters_setting_new.png" style="width: 450px;" /></a>
 <p>The description of all adjustable parameters and the corresponding recommend values are shown as follows:</p>
 <table class="docutils align-default">
 <colgroup>
@@ -125,50 +125,55 @@
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td rowspan="3"><p>Data Augmentation</p></td>
+<tr class="row-even"><td rowspan="4"><p>Data Augmentation</p></td>
 <td><p>number</p></td>
 <td><p>the number of the generated simulated spectra</p></td>
 <td><p>30000</p></td>
 </tr>
-<tr class="row-odd"><td><p>noise rate</p></td>
+<tr class="row-odd"><td><p>max number of
+components</p></td>
+<td><p>the max number of components used to generate augmented spectra</p></td>
+<td><p>3</p></td>
+</tr>
+<tr class="row-even"><td><p>noise rate</p></td>
 <td><p>control the noise level of the generated simulated spectra</p></td>
 <td><p>0.5%</p></td>
 </tr>
-<tr class="row-even"><td><p>save path</p></td>
+<tr class="row-odd"><td><p>save path</p></td>
 <td><p>path for saving the augmented spectra. If empty, they are not saved</p></td>
 <td></td>
 </tr>
-<tr class="row-odd"><td rowspan="3"><p>Raman Shift</p></td>
+<tr class="row-even"><td rowspan="3"><p>Raman Shift</p></td>
 <td><p>start</p></td>
 <td><p>starting point of the analyzed Raman shift range</p></td>
 <td></td>
 </tr>
-<tr class="row-even"><td><p>end</p></td>
+<tr class="row-odd"><td><p>end</p></td>
 <td><p>ending point of the analyzed Raman shift range</p></td>
 <td></td>
 </tr>
-<tr class="row-odd"><td><p>interval</p></td>
+<tr class="row-even"><td><p>interval</p></td>
 <td><p>sampling interval of the analyzed Raman shift</p></td>
 <td></td>
 </tr>
-<tr class="row-even"><td rowspan="5"><p>Training Process</p></td>
+<tr class="row-odd"><td rowspan="5"><p>Training Process</p></td>
 <td><p>optimizer</p></td>
 <td><p>minimize (or maximize) the loss function during the training procedure</p></td>
 <td><p>Adam</p></td>
 </tr>
-<tr class="row-odd"><td><p>learning rate</p></td>
+<tr class="row-even"><td><p>learning rate</p></td>
 <td><p>control the adjust degree of the weights (and bias) of our network with respect the loss gradient.</p></td>
 <td><p>0.00001</p></td>
 </tr>
-<tr class="row-even"><td><p>batch size</p></td>
+<tr class="row-odd"><td><p>batch size</p></td>
 <td><p>the number of samples used for one weights (and bias) update step</p></td>
 <td><p>512</p></td>
 </tr>
-<tr class="row-odd"><td><p>epochs</p></td>
+<tr class="row-even"><td><p>epochs</p></td>
 <td><p>the number of times to train the entire sample set</p></td>
 <td><p>500</p></td>
 </tr>
-<tr class="row-even"><td><p>models path</p></td>
+<tr class="row-odd"><td><p>models path</p></td>
 <td><p>save path of the weights (and bias) of CNN models</p></td>
 <td></td>
 </tr>
@@ -181,7 +186,7 @@ After the training process, a training report will given on <strong>Training Rep
 <section id="load-models">
 <h2>Load Models<a class="headerlink" href="#load-models" title="Permalink to this headline"></a></h2>
 <p>if you already have some models trained in EasyCID, in order to load those models, please select the group name and click on <strong>Function/load</strong> in the menu of training.</p>
-<a class="reference internal image-reference" href="_images/Load_Models_Window.png"><img alt="_images/Load_Models_Window.png" src="_images/Load_Models_Window.png" style="width: 300px;" /></a>
+<a class="reference internal image-reference" href="_images/Load_Models_Window.png"><img alt="_images/Load_Models_Window.png" src="_images/Load_Models_Window.png" style="width: 250px;" /></a>
 <p>Then, <strong>Link Models Window</strong> will pop up. To successful link to the exist models, it is necessary to select the start, end and interval of the Raman shift corresponding to the models, and the storage folder for the models. <em>Note that</em> <strong>If the models is built by EasyCID and the file named ModelsInfo.json is in the storage folder, the start, end and interval of the Raman shift will aotumatically set.</strong></p>
 </section>
 <section id="perform-analysis">

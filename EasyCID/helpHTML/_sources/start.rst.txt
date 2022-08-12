@@ -46,8 +46,8 @@ Training the CNN models
 
 To build CNN models for a specific task, one need to adjust the parameters of the modeling process. In order to build CNN models, please select the name of a *Group* or a *spectrum*, then click **Function/start** in the menu of training. The **Training Parameters Window** will subsequently pop up for adjusting the parameters used in training process.
 
-.. image:: ./images/parameters_setting.png                                
-    :width: 400px
+.. image:: ./images/parameters_setting_new.png                                
+    :width: 450px
 
 The description of all adjustable parameters and the corresponding recommend values are shown as follows:
 
@@ -55,6 +55,9 @@ The description of all adjustable parameters and the corresponding recommend val
 |                  | Name          | Description                                                                                        | Recommend |
 +==================+===============+====================================================================================================+===========+
 | Data Augmentation| number        | the number of the generated simulated spectra                                                      | 30000     |
+|                  +---------------+----------------------------------------------------------------------------------------------------+-----------+
+|                  | max number of | the max number of components used to generate augmented spectra                                    | 3         |
+|                  | components	   |                                                                                                    |           |
 |                  +---------------+----------------------------------------------------------------------------------------------------+-----------+
 |                  | noise rate    | control the noise level of the generated simulated spectra                                         | 0.5%      |
 |                  +---------------+----------------------------------------------------------------------------------------------------+-----------+
@@ -89,7 +92,7 @@ Load Models
 if you already have some models trained in EasyCID, in order to load those models, please select the group name and click on **Function/load** in the menu of training.
 
 .. image:: ./images/Load_Models_Window.png                                
-    :width: 300px
+    :width: 250px
 
 Then, **Link Models Window** will pop up. To successful link to the exist models, it is necessary to select the start, end and interval of the Raman shift corresponding to the models, and the storage folder for the models. *Note that* **If the models is built by EasyCID and the file named ModelsInfo.json is in the storage folder, the start, end and interval of the Raman shift will aotumatically set.**
 

@@ -16,7 +16,13 @@ EasyCID can extract the spectral information from raw Raman spectra in SPC, JCAM
 Data Augmentation
 -----------------
 
-Data augmentation can generate enough data to train the deep neural network and improve the generalization ability of the models. For each spectrum of compound in database, simulated spectra are obtained by mixing pure spectra in pairs and adding random gaussian noise, where half of the simulated spectra contained this compound called positive spectra, while the other half do not contain called negative ones. For the positive spectra, the spectra of the other interference compounds were randomly combined with the original spectra, and the ratios of the original spectrum was not less than 10 percent. The noise level is equal to the maximum value of simulated spectrum times the noise rate. Finally, the simulated spectra were randomly divided into three parts in the 8:1:1 ratio, which are used for training, validation, and testing set respectively.
+Data augmentation can generate enough spectra to train deep neural networks and improve the generalization ability of models. 
+
+For the spectrum of each compound in a database, its augmented spectra were obtained by adding different pure spectra at random ratios with random Gaussian noise. There are two types of augmented spectra: positives and negatives. For positives, the spectra of the other interference compounds were randomly combined with the spectrum of the selected compound, and the ratio of the selected compound in each augmented spectra was set as not less than 10 percent. For negatives, spectra (without the selected component) were randomly sampled from the spectral database, and their ratios were also randomly generated. 
+
+Then, these spectra were summed according to the ratios. For each augmented spectra, the noise level (standard deviation of Gaussian noise) was equal to the product of the maximum value of the spectrum and the noise rate. The number of components for augmenting spectra ranged from 2 to the max number of components, which is a parameter that can be adjusted by users. The ratio of the augmented spectra of different max number of components was determined by their combinatorial numbers. For example, when the total number of components is 13 and the max components is 4. For positives, the ratio of the augmented spectra with different max number of components from 2 to 4 is equal to C(1,12):C(2,12):C(3,12). For negatives, the ratio is equal to C(2,12):C(3,12):C(4,12). 
+
+Finally, the augmented spectra were randomly divided into the training, validation, and test sets in the ratio of 8:1:1.
 
 CNN models
 ----------
