@@ -1,9 +1,0 @@
-numpy
-scipy
-matplotlib
-scikit_learn
-pandas
-PyQt5
-requests
-chardet
-tensorflow
