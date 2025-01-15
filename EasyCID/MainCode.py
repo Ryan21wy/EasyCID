@@ -339,7 +339,7 @@ class LoadModels(QDialog):
         dir = os.listdir(model_path)
         for file in dir:
             path = os.path.join(model_path, file)
-            if os.path.isfile(path) and file.split('.')[-1] == 'h5':
+            if os.path.isfile(path) and os.path.splitext(file)[1] == '.h5':
                 try:
                     reload_model.load_weights(path)
                     x_test = x_test.reshape(x_test.shape[0], x_test.shape[1], 1)
@@ -347,7 +347,7 @@ class LoadModels(QDialog):
                 except Exception as err:
                     MessageDisplay.warning(self, "Error", str(err))
                     return
-                correct_models.append(file.split('.')[0])
+                correct_models.append(os.path.splitext(file)[0])
         if not correct_models:
             MessageDisplay.warning(self, "Error", 'No CNN models available')
             return
@@ -479,7 +479,7 @@ class TrainingRun(QThread):
         self.new_axis = info_para[4]
 
     def run(self):
-        # try:
+        try:
             self.signal.emit('run')
             Spectrumdata = np.zeros((1, self.new_axis.shape[0]))
             count = len(self.spectra)
@@ -557,8 +557,8 @@ class TrainingRun(QThread):
                 self.bar_text.emit('%s/%s' % (current_com, total_com))
                 self.process_signal.emit('Training Active [%s<%s] %ss/it' % (cost_t, remain_t, average_t))
             self.signal.emit('finished')
-        # except Exception as err:
-        #     self.err_signal.emit(str(err))
+        except Exception as err:
+            self.err_signal.emit(str(err))
 
 
 class PredictionRun(QThread):
@@ -1007,6 +1007,8 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.mix_data['y'] = []
         self.mix_data['it'] = []
         datas = self.read_spectra(data_path)
+        if datas is None:
+            return
         for data in datas:
             self.mix_data['x'].append(np.array(json.loads(data[3])))
             self.mix_data['y'].append(np.array(json.loads(data[2])))
@@ -1020,61 +1022,64 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         self.pred_run.setEnabled(True)
 
     def read_spectra(self, spectra_path):
-        datas = []
-        pathDir = os.listdir(spectra_path)
-        for s in pathDir:
-            newfile = os.path.join(spectra_path, s)
-            if os.path.isfile(newfile):
-                if os.path.splitext(newfile)[1] == ".txt":
-                    try:
-                        readfile = parseBWTekFile(newfile, s, select_ramanshift=False,
-                                                  xname='Raman Shift', yname="Dark Subtracted #1")
-                        raw_axis = readfile['axis']
-                        raw_spectrum = readfile['spectrum']
-                        raw_axis, raw_spectrum = zip(*sorted(zip(raw_axis, raw_spectrum)))
-                        name = readfile['name']
-                        inter_time = readfile['integral_time']
-                        datas.append([None, name, json.dumps(list(raw_spectrum)),
-                                      json.dumps(list(raw_axis)), inter_time, 0])
-                    except:
-                        raw_axis, raw_spectrum = read_simple_txt(newfile)
+        try:
+            datas = []
+            pathDir = os.listdir(spectra_path)
+            for s in pathDir:
+                newfile = os.path.join(spectra_path, s)
+                if os.path.isfile(newfile):
+                    if os.path.splitext(newfile)[1] == ".txt":
+                        try:
+                            readfile = parseBWTekFile(newfile, s, select_ramanshift=False,
+                                                      xname='Raman Shift', yname="Dark Subtracted #1")
+                            raw_axis = readfile['axis']
+                            raw_spectrum = readfile['spectrum']
+                            raw_axis, raw_spectrum = zip(*sorted(zip(raw_axis, raw_spectrum)))
+                            name = readfile['name']
+                            inter_time = readfile['integral_time']
+                            datas.append([None, name, json.dumps(list(raw_spectrum)),
+                                          json.dumps(list(raw_axis)), inter_time, 0])
+                        except:
+                            raw_axis, raw_spectrum = read_simple_txt(newfile)
+                            raw_axis, raw_spectrum = zip(*sorted(zip(raw_axis, raw_spectrum)))
+                            name = os.path.splitext(s)[0]
+                            datas.append([None, name, json.dumps(list(raw_spectrum)), json.dumps(list(raw_axis)), 0.0, 0])
+
+                    elif os.path.splitext(newfile)[1].lower() == ".spc":
+                        axis, x, y = readSPC(newfile)
+                        raw_axis = x.reshape(-1)
+                        raw_spectrum = y.reshape(-1)
                         raw_axis, raw_spectrum = zip(*sorted(zip(raw_axis, raw_spectrum)))
                         name = os.path.splitext(s)[0]
                         datas.append([None, name, json.dumps(list(raw_spectrum)), json.dumps(list(raw_axis)), 0.0, 0])
 
-                elif os.path.splitext(newfile)[1].lower() == ".spc":
-                    axis, x, y = readSPC(newfile)
-                    raw_axis = x.reshape(-1)
-                    raw_spectrum = y.reshape(-1)
-                    raw_axis, raw_spectrum = zip(*sorted(zip(raw_axis, raw_spectrum)))
-                    name = os.path.splitext(s)[0]
-                    datas.append([None, name, json.dumps(list(raw_spectrum)), json.dumps(list(raw_axis)), 0.0, 0])
+                    elif os.path.splitext(newfile)[1].lower() == ".jdx":
+                        readfile = jcamp.JCAMP_reader(newfile)
+                        raw_axis = readfile['x']
+                        raw_spectrum = readfile['y']
+                        raw_axis, raw_spectrum = zip(*sorted(zip(raw_axis, raw_spectrum)))
+                        name = readfile['title']
+                        datas.append([None, name, json.dumps(list(raw_spectrum)), json.dumps(list(raw_axis)), 0.0, 0])
 
-                elif os.path.splitext(newfile)[1].lower() == ".jdx":
-                    readfile = jcamp.JCAMP_reader(newfile)
-                    raw_axis = readfile['x']
-                    raw_spectrum = readfile['y']
-                    raw_axis, raw_spectrum = zip(*sorted(zip(raw_axis, raw_spectrum)))
-                    name = readfile['title']
-                    datas.append([None, name, json.dumps(list(raw_spectrum)), json.dumps(list(raw_axis)), 0.0, 0])
-
-                elif os.path.splitext(newfile)[1].lower() == ".db":
-                    with sqlite3.connect(newfile) as con:
-                        con.row_factory = sqlite3.Row
-                        query_str = 'SELECT * FROM standardSamples where include=1'
-                        rows = con.cursor().execute(query_str).fetchall()
-                        for i, row in enumerate(rows):
-                            spec = {}
-                            for key in row.keys():
-                                spec[key] = row[key]
-                            name = spec['name']
-                            inter_time = spec['integral']
-                            raw_spectrum = np.frombuffer(spec['spectrum'], dtype=np.float32)
-                            raw_axis = np.linspace(spec['XStart'], spec['XEnd'],
-                                                   int((spec['XEnd'] - spec['XStart']) / spec['XInterval']) + 1)
-                            datas.append([None, name, json.dumps(list(raw_spectrum)),
-                                          json.dumps(list(raw_axis)), inter_time, 0])
-        return datas
+                    elif os.path.splitext(newfile)[1].lower() == ".db":
+                        with sqlite3.connect(newfile) as con:
+                            con.row_factory = sqlite3.Row
+                            query_str = 'SELECT * FROM standardSamples where include=1'
+                            rows = con.cursor().execute(query_str).fetchall()
+                            for i, row in enumerate(rows):
+                                spec = {}
+                                for key in row.keys():
+                                    spec[key] = row[key]
+                                name = spec['name']
+                                inter_time = spec['integral']
+                                raw_spectrum = np.frombuffer(spec['spectrum'], dtype=np.float32)
+                                raw_axis = np.linspace(spec['XStart'], spec['XEnd'],
+                                                       int((spec['XEnd'] - spec['XStart']) / spec['XInterval']) + 1)
+                                datas.append([None, name, json.dumps(list(raw_spectrum)),
+                                              json.dumps(list(raw_axis)), inter_time, 0])
+            return datas
+        except Exception as err:
+            MessageDisplay.warning(self, "Error", str(err))
 
     def load_spectra(self):
         global path_config
@@ -1318,14 +1323,14 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         GroupMI = None
         ComponentMI = None
         fixed = False
-        if not item.childCount():
+        if not item.childCount() or item.childCount() == 0:
             self.train_group_widget = item.parent()
             self.train_group = item.parent().text(0)
             group_id = self.EasyDB.select('Group_ID', 'Groups', 'Group_Name=?', (self.train_group,))[0][0]
             names = self.EasyDB.select('Component_Name', 'Component_Info', 'From_Group=?', (group_id,))
             for name in names:
                 self.train_com_name.append(name[0])
-            if item.text(2) == 'Yes':
+            if item.text(1) == 'Yes':
                 reply = MessageDisplay.question(self, 'Train', 'Do you want to re-train "%s"?' % item.text(0),
                                                 "Retrain", "No")
                 if reply == "No":
@@ -1545,8 +1550,8 @@ class AppWindow(QMainWindow, Ui_MainWindow):
         dir = os.listdir(models_path)
         for file in dir:
             if os.path.isfile(os.path.join(group_para[-2], file)):
-                [name, type] = file.split('.')
-                if (name in component_list) and (type == 'h5'):
+                name, type = os.path.splitext(file)
+                if (name in component_list) and (type == '.h5'):
                     model_path_list.append(os.path.join(models_path, file))
                     self.candidate_model.append(name)
         if not model_path_list:
