@@ -6,7 +6,7 @@ EasyCID is a practical and efficient tool for analyzing unknown mixtures with Ra
 
 The current install version of EasyCID only supports Windows 64-bit version. It has been test on _**Windows 7**_, _**Windows 10**_ and _**Windows 11**_.
 
-Install Package: [EasyCID-1.0.0-Windows.exe](https://github.com/Ryan21wy/EasyCID/releases/download/v1.0.0/EasyCID.exe)
+Install Package: [EasyCID-1.0.1-Windows.exe](https://github.com/Ryan21wy/EasyCID/releases/download/v1.0.1/EasyCID.exe)
 
 #### Note: When installing, please do not change the default folder name (EasyCID).
 
